@@ -53,9 +53,10 @@ All keys are strings.
 
     Links related to the package where the key is the link name and the value is the URL
 
-  + `requirements (kvlist(string => proplist(...)))`
+  + `requirements (kvlist(string => kvlist(...)))`
 
-    All dependencies of the package where the key is the dependent name
+    All dependencies of the package where the key is the dependent name,
+    all keys below are required
 
     + `app (string)`
 
