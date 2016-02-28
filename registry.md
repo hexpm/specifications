@@ -22,7 +22,7 @@ Below is the layout of the table.
         - Requirement: binary Elixir [version requirement][]
         - Optional: boolean, true if it's an optional dependency
         - App: binary, OTP application name
-    - Checksum: binary hex encoded sha256 checksum of package, see [Package Tarball](https://github.com/hexpm/hex_web/blob/master/specifications/package_tarball.md)
+    - Checksum: binary hex encoded sha256 checksum of package, see [Package Tarball](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
     - BuildTools: list of build tool names as binary strings
 
 [`ets:tab2file/1`]: http://www.erlang.org/doc/man/ets.html#tab2file-2

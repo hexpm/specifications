@@ -8,7 +8,7 @@ The package tarball contains the following files:
 
   * metadata.config
 
-    Erlang term file, see [Package metadata](https://github.com/hexpm/hex_web/blob/master/specifications/package_metadata.md).
+    Erlang term file, see [Package metadata](https://github.com/hexpm/specifications/blob/master/package_metadata.md).
 
   * contents.tar.gz
 
