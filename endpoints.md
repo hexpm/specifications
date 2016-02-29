@@ -4,12 +4,12 @@ The Hex API has two endpoints: an HTTP API, which is used for all administrative
 
 ### HTTP API
 
-See [apiary.apib](https://github.com/hexpm/hex_web/blob/master/apiary.apib) file at the root of this repository.
+See [apiary.apib](https://github.com/hexpm/specifications/blob/master/apiary.apib) file at the root of this repository.
 
 ### CDN
 
-  * /registry.ets.gz - [Registry](https://github.com/hexpm/hex_web/blob/master/specifications/registry.md)
-  * /tarballs/PACKAGE-VERSION.tar - [Package tarball](https://github.com/hexpm/hex_web/blob/master/specifications/package_tarball.md)
+  * /registry.ets.gz - [Registry](https://github.com/hexpm/specifications/blob/master/registry.md)
+  * /tarballs/PACKAGE-VERSION.tar - [Package tarball](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
 
 ### Hex.pm endpoints
 
