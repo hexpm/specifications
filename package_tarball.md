@@ -103,10 +103,11 @@ Transition to reproducible archives will happen in a few phases:
    start implementing the changes described above.
 2. Information about archive reproducibility will be attached to metadata of
    every package (both in index and the website), so package consumers can
-   start relying on the reproducible packages.
-3. Hex.pm will issue a warning during the upload phase when an incompatible
+   start relying on the reproducible packages. A reproducible package would
+   have `reproducible: true` set as part of it's metadata.
+3. Hex will issue a warning during the upload phase when an incompatible
    package is uploaded.
-4. After a grace period, hex.pm might reject non-reproducible archives. This is
+4. After a grace period, Hex might reject non-reproducible archives. This is
    still under discussion.
 
 ### Appendix: creating a reproducible package.
@@ -130,11 +131,19 @@ Working example as of 2016-03-29:
 
 #### FreeBSD
 
-TODO
+TODO.
 
 #### Windows
 
-TODO
+_This section is incomplete._
+
+There seem to be two options for Windows to acquire GNU Tools:
+
+* Cygwin. It is a GNU-compatible system with GNU Tar and GNU GZip available.
+  Download the release, install it, and use the command-line options just like
+  on Linux.
+* MinGW: gzip.exe and tar.exe should be possible to download and use out of the
+  box.
 
 [1]: https://medium.com/@azerbike/i-ve-just-liberated-my-modules-9045c06be67c
 [2]: http://brew.sh/
