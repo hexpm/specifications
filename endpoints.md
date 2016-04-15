@@ -21,5 +21,6 @@ A repository can optionally RSA sign its registry. The RSA public key should be 
 Hex.pm uses the following root endpoints:
 
   * HTTP API - https://hex.pm/api
-  * Repository - https://hexpmrepo.global.ssl.fastly.net
+  * Repository - https://repo.hex.pm
+  * Repository - https://hexpmrepo.global.ssl.fastly.net (DEPRECATED!)
   * Repository - https://s3.amazonaws.com/s3.hex.pm (DEPRECATED!)
