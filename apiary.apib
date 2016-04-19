@@ -358,6 +358,7 @@ After a release has been published there is a one hour window where it can be mo
             + `requirement` (string, required) - [Version requirement](http://elixir-lang.org/docs/stable/elixir/Version.html) on dependency
             + `optional` (boolean, required) - An optional dependency only has to be satisfied if a package higher up the chain also requires it
             + `app` (string, required) - OTP application name, usually the dependency name but can differ
+            + `source` (string, optional) - Repository URL where package dependency is located, if attribute is missing the package is located in the same repository it was fetched from
     + `downloads` (number, required) - Number of downloads of the release
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp

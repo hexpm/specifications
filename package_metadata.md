@@ -70,6 +70,10 @@ All keys are strings.
 
       [Version requirement][] on the dependent
 
+    + `source (string)`
+
+      Repository URL where package dependency is located, this attribute is optional, if it is missing the package is located in the same repository it was fetched from
+
   + `build_tools (list(string))`
 
       Names of build tools that can build the package
