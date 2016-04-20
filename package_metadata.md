@@ -72,7 +72,7 @@ All keys are strings.
 
     + `source (string)`
 
-      Repository URL where package dependency is located, this attribute is optional, if it is missing the package is located in the same repository it was fetched from
+      Repository URL where package dependency is located. It has a special value `"PRIMARY"` which means the package is located in the client's primary repository, in most clients that would be hex.pm
 
   + `build_tools (list(string))`
 

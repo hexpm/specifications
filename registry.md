@@ -22,11 +22,11 @@ Below is the layout of the table.
         - Requirement: binary Elixir [version requirement][]
         - Optional: boolean, true if it's an optional dependency
         - App: binary, OTP application name
-        - Source: binary, URL to remote repository where package is located, if `false` the package is located in the current repository 1)
+        - Source: binary, URL to remote repository where package is located. It has two special values `"P"` and `"S"`, which are short for primary and self respectively. Primary means the package is located in the client's primary repository, in most clients that would be hex.pm. Self means the package is located in the same repository as this registry, repositories can use this value to guard against future changes of the repository URL 1)
     - Checksum: binary hex encoded sha256 checksum of package, see [Package Tarball](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
     - BuildTools: list of build tool names as binary strings
 
-1) The hex.pm repository will reject packages where this is not `false`
+1) The hex.pm repository will reject packages where this value is not `"P"`
 
 [`ets:tab2file/1`]: http://www.erlang.org/doc/man/ets.html#tab2file-2
 [semver]: http://semver.org/
