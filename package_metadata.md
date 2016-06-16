@@ -74,6 +74,10 @@ All keys are strings.
 
       Names of build tools that can build the package
 
+  + `extra (kvlist(string => kvlist(...)))`
+
+      Extra information about the package
+
 ### Optional dependencies
 
 An optional dependency will only be used if a package higher up the dependency chain also depends on it (only if that the dependency is not defined as optional as well).
