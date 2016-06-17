@@ -70,6 +70,10 @@ All keys are strings.
 
       [Version requirement][] on the dependent
 
+    + `source (string)`
+
+      Repository URL where package dependency is located. It has a special value `"PRIMARY"` which means the package is located in the client's primary repository, in most clients that would be hex.pm
+
   + `build_tools (list(string))`
 
       Names of build tools that can build the package
