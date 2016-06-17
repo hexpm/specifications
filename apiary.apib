@@ -6,7 +6,7 @@ The Hex API is based on REST, it is currently in beta and so can change at any t
 
 ### Related specifications
 
-The HTTP API is only one of the specifications that makes the package manager Hex. Keep in mind that the HTTP API is not required to be implemented for clients to be able to consume the repository. Repositories that doesn't allow public users to publish packages can have any mechanism for publishing to their repository. For publicly visible repositories, it is recommended to also implement the endpoints for browsing packages (/packages/*).
+The HTTP API is only one of the specifications that makes the package manager Hex. Keep in mind that the HTTP API is not required to be implemented for clients to be able to consume the repository. Repositories that doesn't allow public users to publish packages can have any mechanism for publishing to their repository. For publicly visible repositories, it is recommended to also implement the endpoints for browsing packages (/packages/\*).
 
 Below is a list of related specifications:
 
@@ -112,6 +112,18 @@ Basic authentication is only allowed on some resources, specifically ones used t
             "email": "has invalid format"
           }
         }
+
+### Package search
+
+By default search will do a wildcard match on the package name and full text search on the package description. If the search string is `nerves`, package names matching `*nerves*` will be found and packages having `nerves` or a stemmed version of the string in the description.
+
+Search can also be performed on specific fields, for example: `name:nerves* extra:package,name,postgresql`.
+
+The search fields are:
+
+  * `name` - Package name, can include the wildcard operator `*` at the end or start of the string.
+  * `description` - Full text search package description.
+  * `extra` - Comma-separated search on `extra` map in metadata. `extra:type,nerves` will match `{"type": "nerves"}`.
 
 # Group Users
 
@@ -225,7 +237,7 @@ Will start the process to reset a User's password. A confirmation email will be 
 
 Packages are essentially a (unique) name with some associated metadata. Group releases are a way to group and structure package releases which will be covered later.
 
-## Packages Collection [/packages{?sort}]
+## Packages Collection [/packages{?sort,search}]
 
 This collection is paginated.
 
@@ -240,6 +252,8 @@ This collection is paginated.
             + downloads - Number of package downloads, ascending
             + inserted_at - Package insertion time, ascending
             + updated_at - Package last update time, descending
+    + search: phoenix (string, optional)
+        Search string, see "Package search" above
 
 + Request
 
