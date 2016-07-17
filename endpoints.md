@@ -8,9 +8,12 @@ See [apiary.apib](https://github.com/hexpm/specifications/blob/master/apiary.api
 
 ### Repository
 
-  * `/registry.ets.gz` - [Registry](https://github.com/hexpm/specifications/blob/master/registry.md)
-  * `/registry.ets.gz.signed` - (optional)
+  * `/names` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
+  * `/versions` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
+  * `/packages/[PACKAGE]` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
   * `/tarballs/PACKAGE-VERSION.tar` - [Package tarball](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
+  * `/registry.ets.gz` - [Registry v1](https://github.com/hexpm/specifications/blob/master/registry-v1.md) (DEPRECATED!)
+  * `/registry.ets.gz.signed` - (optional) (DEPRECATED!)
 
 #### Registry signing
 

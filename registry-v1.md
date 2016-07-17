@@ -1,4 +1,6 @@
-# Registry
+# ETS Registry
+
+*NOTE: This registry format will be deprecated in favor of the [new version](https://github.com/hexpm/specifications/blob/master/registry-v2.md)*
 
 The registry is an ETS table serialized with [`ets:tab2file/1`][]. Clients
 consuming the registry entries should always match on only the front of a list,
