@@ -40,9 +40,13 @@ The returned HTTP headers will tell you about your current rate limit status:
 
 Header                  | Description
 :---------------------- | :----------
-`x-ratelimit-limit`     | The maximum number of requests that the consumer is permitted to make per minute.
-`x-ratelimit-remaining` | The remaining number of requests the consumer is allowed to make until reset.
-`x-ratelimit-reset`     | The time at which the rate limit window reset in UNIX epoch.
+`X-RateLimit-Limit`     | The maximum number of requests that the consumer is permitted to make per minute.
+`X-RateLimit-Remaining` | The remaining number of requests the consumer is allowed to make until reset.
+`X-RateLimit-Reset`     | The time at which the rate limit window reset in UNIX epoch.
+
+### User Agent required
+
+All API requests must include a valid `User-Agent` header. An invalid or missing header will return a `400 Bad Request` response. The name of the client and version should be included, an example of the official Mix client is `User-Agent: Hex/0.12.1 (Elixir/1.3.0) (OTP/19.0)`.
 
 ### Pagination
 
