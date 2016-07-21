@@ -2,15 +2,15 @@
 
 *NOTE: This registry is not yet deployed on hex.pm*
 
-The first version of the registry format used a single file for the entire registry. While this was efficient in the number of HTTP requests needed to resolve dependencies, the size of the registry would grow out of control as the repository grows.
+The first version of the registry format used a single resource for the entire registry. While this was efficient in the number of HTTP requests needed to resolve dependencies, the size of the registry would grow out of control as the repository grows.
 
-The new version of the registry format is split into multiple files to make it scale as the repository grows with more packages.
+The new version of the registry format is split into multiple resources to make it scale as the repository grows with more packages.
 
-For every package in the repository there is a package registry file under `/packages/[NAME]` in the repository, it contains all the releases of that package and all dependencies of the releases. There are also two index files `/names` and `/versions` that contains all package names and all package names+versions respectively.
+For every package in the repository there is a package registry resource under `/packages/[NAME]` in the repository, it contains all the releases of that package and all dependencies of the releases. There are also two index resources `/names` and `/versions` that contains all package names and all package names+versions respectively.
 
-## File formats
+## Formats
 
-The files are serialized with [Protocol Buffers](https://developers.google.com/protocol-buffers/).
+The resources are serialized with [Protocol Buffers](https://developers.google.com/protocol-buffers/).
 
 If you are on an Erlang system it is recommended to use the already generated files in [registry](https://github.com/hexpm/specifications/blob/master/registry). The files were generated with `gpb` 3.23.0 with the options below:
 
@@ -22,6 +22,8 @@ If you are on an Erlang system it is recommended to use the already generated fi
 ```
 
 ### names.proto
+
+For the `/names` resource.
 
 ```protobuf
 message Names {
@@ -36,6 +38,8 @@ message Package {
 ```
 
 ### versions.proto
+
+For the `/versions` resource.
 
 ```protobuf
 message Versions {
@@ -52,6 +56,8 @@ message Package {
 ```
 
 ### package.proto
+
+For the `/packages/[NAME]` resources.
 
 ```protobuf
 message Package {
