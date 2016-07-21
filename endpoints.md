@@ -15,9 +15,9 @@ See [apiary.apib](https://github.com/hexpm/specifications/blob/master/apiary.api
   * `/registry.ets.gz` - [Registry v1](https://github.com/hexpm/specifications/blob/master/registry-v1.md) (DEPRECATED!)
   * `/registry.ets.gz.signed` - (optional) (DEPRECATED!)
 
-#### Registry signing
+#### Registry v1 signing
 
-A repository can optionally RSA sign its registry. The RSA public key should be provided to clients out-of-band of the registry fetching, for example by shipping the client with a public key or by users manually installing it. The repository signs the sha512 digest of the registry and base 16 encodes it with lower case characters. The repository should store the signature on the `/registry.ets.gz.signed` and update it when the registry is updated. For performance reasons the signature can also be provided in either the `x-hex-signature` or the `x-amz-meta-signature` header on the `/registry.ets.gz` endpoint.
+A repository can optionally RSA sign its registry. The RSA public key should be provided to clients out-of-band of the registry fetching, for example by shipping the client with a public key or by users manually installing it. The repository signs the SHA-512 digest of the registry and base 16 encodes it with lower case characters. The repository should store the signature on the `/registry.ets.gz.signed` and update it when the registry is updated. For performance reasons the signature can also be provided in either the `x-hex-signature` or the `x-amz-meta-signature` header on the `/registry.ets.gz` endpoint.
 
 ### Hex.pm endpoints
 

@@ -86,3 +86,25 @@ message Dependency {
   optional string app = 4;
 }
 ```
+
+### signed.proto
+
+For signing, see below.
+
+```protobuf
+message Signed {
+  // Signed contents
+  required bytes payload = 1;
+  // The signature
+  optional bytes signature = 2;
+}
+```
+
+## Signing
+
+All resources will be signed by the repository's private key. A signed resource is wrapped in a `Signed` message. The data under the `payload`
+field is signed by the `signature` field.
+
+The signature is an (unencoded) RSA signature of the (unencoded) SHA-512 digest of the payload.
+
+Repositories are required to sign all registry resources.
