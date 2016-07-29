@@ -52,6 +52,8 @@ message Package {
   required string name = 1;
   // All released versions of the package
   repeated string versions = 2;
+  // Zero-based indexes of yanked versions in the versions field, see package.proto
+  repeated int32 yanked = 3 [packed=true];
 }
 ```
 
@@ -72,6 +74,22 @@ message Release {
   required bytes checksum = 2;
   // All dependencies of the release
   repeated Dependency dependencies = 3;
+  // If set the release is yanked, a yanked release should only be
+  // resolved if it has already been locked in a project
+  optional YankStatus yanked = 4;
+}
+
+message YankStatus {
+  required YankReason reason = 1;
+  optional string message = 2;
+}
+
+enum YankReason {
+  YANKED_OTHER = 0;
+  YANKED_INVALID = 1;
+  YANKED_SECURITY = 2;
+  YANKED_DEPRECATED = 3;
+  YANKED_RENAMED = 4;
 }
 
 message Dependency {
@@ -108,3 +126,13 @@ field is signed by the `signature` field.
 The signature is an (unencoded) RSA signature of the (unencoded) SHA-512 digest of the payload.
 
 Repositories are required to sign all registry resources.
+
+## Release yanking
+
+Individual releases can be yanked. A yanked release can still be used like any normal release, the only difference is that the particular release will be marked in the UI for the repository and a notice can be displayed to client users that are using that version.
+
+A release is yanked if the `yanked` field is set on `Release`. A `YankStatus` has a `YankReason` enum with the reason for the yank, clients need to support future additions to this enum (gpb is getting support for this [1]). A, user set, message can be attached to the `YankStatus` clarifying the yank reason.
+
+It is important that clients still allow users to use yanked releases to avoid breaking repeatable builds.
+
+[1] https://github.com/tomas-abrahamsson/gpb/issues/69
