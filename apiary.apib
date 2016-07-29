@@ -376,6 +376,15 @@ After a release has been published there is a one hour window where it can be mo
             + `requirement` (string, required) - [Version requirement](http://elixir-lang.org/docs/stable/elixir/Version.html) on dependency
             + `optional` (boolean, required) - An optional dependency only has to be satisfied if a package higher up the chain also requires it
             + `app` (string, required) - OTP application name, usually the dependency name but can differ
+    + `yanked` (object, optional) - Yank status, if not set the release is not yanked
+        + `reason` (enum[string], required) - Reason for yank
+            + Members
+                + `other`
+                + `invalid`
+                + `security`
+                + `deprecated`
+                + `renamed`
+        + `message` (string, optional) - An additional, clarifying message for the yank
     + `downloads` (number, required) - Number of downloads of the release
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
@@ -456,6 +465,48 @@ Will also create a new package or update an existing one. See the package tarbal
               "inserted_at": "2014-04-23T18:58:54Z",
               "updated_at": "2015-04-26T15:26:23Z"
             }
+
+## Release yanking [/packages/{name}/releases/{version}/yank]
+
++ Parameters
+    + name: plug (string)
+        Package name
+    + version: 0.4.1 (string)
+        Release version, should be a [Semantic Version](http://semver.org/)
+
+### Mark Release as Yanked [POST]
+
++ Request
+
+    Marks a release as yanked.
+
+    + Attributes
+        + `reason` (enum[string], required) - Reason for yank
+            + Members
+                + `other`
+                + `invalid`
+                + `security`
+                + `deprecated`
+                + `renamed`
+        + `message` (string, optional) - An additional, clarifying message for the yank
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
+    + Body
+
+            {
+              "reason": "deprecated",
+              "message": "This package has been deprecated in favor of ecto."
+            }
+
++ Response 204
+
+### Unmark Release as Yanked [DELETE]
+
++ Response 204
 
 ## Group Package Documentation
 
@@ -590,7 +641,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
     The `secret` will be sent only once. It should be stored after creating the API key. Subsequent responses to GET requests will not include the `secret`.
 
-    + Attributes (array[API Key])
+    + Attributes (API Key)
         + `secret` - The key secret, a 32 character hex encoded string
 
     + Header
