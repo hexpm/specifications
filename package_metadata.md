@@ -21,6 +21,14 @@ All keys are strings.
 
     Package name
 
+  + `namespace (string, optional)`
+
+    Package namespace
+
+  + `private (boolean, optional)`
+
+    Indicates if the package is private, if the field is not set it is treated as `false`
+
   + `version (string)`
 
     Release version, required to be a [Semantic Version][]

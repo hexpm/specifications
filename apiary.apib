@@ -295,6 +295,8 @@ This collection is paginated.
 
 + Attributes
     + `name` (string, required) - Package name
+    + `namespace` (string, optional) - Namespace the package belongs to, if unset the package belongs to the global namespace
+    + `private` (boolean, optional) - The package is private and needs authentication to be visible and fetched
     + `meta` (object, required) - Package metadata
         + `contributors` (array[string], required) - Package maintainers (migrating to rename attribute to `maintainers` both values are valid)
         + `links` (object, required) - Links related to the package, key is the link name, value is the URL
