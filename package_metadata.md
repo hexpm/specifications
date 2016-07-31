@@ -20,6 +20,14 @@ All keys are strings.
   + `name (string) (required)`
 
     Package name
+    
+  + `namespace (string, optional)`
+
+    Package namespace
+
+  + `private (boolean, optional)`
+
+    Indicates if the package is private, if the field is not set it is treated as `false`
 
   + `elixir (string) (optional)`
 
