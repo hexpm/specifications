@@ -382,15 +382,15 @@ After a release has been published there is a one hour window where it can be mo
             + `requirement` (string, required) - [Version requirement](http://elixir-lang.org/docs/stable/elixir/Version.html) on dependency
             + `optional` (boolean, required) - An optional dependency only has to be satisfied if a package higher up the chain also requires it
             + `app` (string, required) - OTP application name, usually the dependency name but can differ
-    + `yanked` (object, optional) - Yank status, if not set the release is not yanked
-        + `reason` (enum[string], required) - Reason for yank
+    + `retired` (object, optional) - Retirement status, if not set the release is not retired
+        + `reason` (enum[string], required) - Reason for retirement
             + Members
                 + `other`
                 + `invalid`
                 + `security`
                 + `deprecated`
                 + `renamed`
-        + `message` (string, optional) - An additional, clarifying message for the yank
+        + `message` (string, optional) - An additional, clarifying message for the retirement
     + `downloads` (number, required) - Number of downloads of the release
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
@@ -472,7 +472,7 @@ Will also create a new package or update an existing one. See the package tarbal
               "updated_at": "2015-04-26T15:26:23Z"
             }
 
-## Release yanking [/packages/{name}/releases/{version}/yank]
+## Retiring Releases [/packages/{name}/releases/{version}/retire]
 
 + Parameters
     + name: plug (string)
@@ -480,21 +480,21 @@ Will also create a new package or update an existing one. See the package tarbal
     + version: 0.4.1 (string)
         Release version, should be a [Semantic Version](http://semver.org/)
 
-### Mark Release as Yanked [POST]
+### Mark Release as Retired [POST]
 
 + Request
 
-    Marks a release as yanked.
+    Marks a release as retired.
 
     + Attributes
-        + `reason` (enum[string], required) - Reason for yank
+        + `reason` (enum[string], required) - Reason for retiring the release
             + Members
                 + `other`
                 + `invalid`
                 + `security`
                 + `deprecated`
                 + `renamed`
-        + `message` (string, optional) - An additional, clarifying message for the yank
+        + `message` (string, optional) - An additional, clarifying message for the retirement
 
     + Header
 
@@ -510,7 +510,7 @@ Will also create a new package or update an existing one. See the package tarbal
 
 + Response 204
 
-### Unmark Release as Yanked [DELETE]
+### Unmark Release as Retired [DELETE]
 
 + Response 204
 
