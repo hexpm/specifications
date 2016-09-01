@@ -52,8 +52,8 @@ message Package {
   required string name = 1;
   // All released versions of the package
   repeated string versions = 2;
-  // Zero-based indexes of yanked versions in the versions field, see package.proto
-  repeated int32 yanked = 3 [packed=true];
+  // Zero-based indexes of retired versions in the versions field, see package.proto
+  repeated int32 retired = 3 [packed=true];
   // If set, the package namespace
   optional string namespace = 4;
 }
@@ -76,22 +76,22 @@ message Release {
   required bytes checksum = 2;
   // All dependencies of the release
   repeated Dependency dependencies = 3;
-  // If set the release is yanked, a yanked release should only be
+  // If set the release is retired, a retired release should only be
   // resolved if it has already been locked in a project
-  optional YankStatus yanked = 4;
+  optional RetirementStatus retired = 4;
 }
 
-message YankStatus {
-  required YankReason reason = 1;
+message RetirementStatus {
+  required RetirementReason reason = 1;
   optional string message = 2;
 }
 
-enum YankReason {
-  YANKED_OTHER = 0;
-  YANKED_INVALID = 1;
-  YANKED_SECURITY = 2;
-  YANKED_DEPRECATED = 3;
-  YANKED_RENAMED = 4;
+enum RetirementReason {
+  RETIRED_OTHER = 0;
+  RETIRED_INVALID = 1;
+  RETIRED_SECURITY = 2;
+  RETIRED_DEPRECATED = 3;
+  RETIRED_RENAMED = 4;
 }
 
 message Dependency {
@@ -143,13 +143,13 @@ Repositories may optionally support namespaces. A namespace can be seen as a sub
  * `/@NAMESPACE/versions`
  * `/@NAMESPACE/packages/NAME`
 
-## Release yanking
+## Retiring Releases
 
-Individual releases can be yanked. A yanked release can still be used like any normal release, the only difference is that the particular release will be marked in the UI for the repository and a notice can be displayed to client users that are using that version.
+Individual releases can be retired. A retired release can still be used like any normal release, the only difference is that the particular release will be marked in the UI for the repository and a notice can be displayed to client users that are using that version.
 
-A release is yanked if the `yanked` field is set on `Release`. A `YankStatus` has a `YankReason` enum with the reason for the yank, clients need to support future additions to this enum, in the protobuf library that generates the files under `registry/` unknown enum values are decoded as their integer value. A, user set, message can be attached to the `YankStatus` clarifying the yank reason.
+A release is retired if the `retired` field is set on `Release`. A `RetirementStatus` has a `RetirementReason` enum with the reason for retiring the release, clients need to support future additions to this enum, in the protobuf library that generates the files under `registry/` unknown enum values are decoded as their integer value. A, user set, message can be attached to the `RetirementStatus` clarifying the reason for retirement.
 
-It is important that clients still allow users to use yanked releases to avoid breaking repeatable builds.
+It is important that clients still allow users to use retired releases to avoid breaking repeatable builds.
 
 ## Links
 

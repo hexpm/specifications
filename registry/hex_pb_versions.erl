@@ -50,7 +50,7 @@ e_msg_Package(Msg, TrUserData) ->
 
 
 e_msg_Package(#{name := F1, versions := F2,
-		yanked := F3} =
+		retired := F3} =
 		  M,
 	      Bin, TrUserData) ->
     B1 = begin
@@ -66,7 +66,7 @@ e_msg_Package(#{name := F1, versions := F2,
     B3 = begin
 	   TrF3 = id(F3, TrUserData),
 	   if TrF3 == [] -> B2;
-	      true -> e_field_Package_yanked(TrF3, B2, TrUserData)
+	      true -> e_field_Package_retired(TrF3, B2, TrUserData)
 	   end
 	 end,
     case M of
@@ -95,20 +95,20 @@ e_field_Package_versions([Elem | Rest], Bin,
     e_field_Package_versions(Rest, Bin3, TrUserData);
 e_field_Package_versions([], Bin, _TrUserData) -> Bin.
 
-e_field_Package_yanked(Elems, Bin, TrUserData)
+e_field_Package_retired(Elems, Bin, TrUserData)
     when Elems =/= [] ->
-    SubBin = e_pfield_Package_yanked(Elems, <<>>,
+    SubBin = e_pfield_Package_retired(Elems, <<>>,
 				     TrUserData),
     Bin2 = <<Bin/binary, 26>>,
     Bin3 = e_varint(byte_size(SubBin), Bin2),
     <<Bin3/binary, SubBin/binary>>;
-e_field_Package_yanked([], Bin, _TrUserData) -> Bin.
+e_field_Package_retired([], Bin, _TrUserData) -> Bin.
 
-e_pfield_Package_yanked([Value | Rest], Bin,
+e_pfield_Package_retired([Value | Rest], Bin,
 			TrUserData) ->
     Bin2 = e_type_int32(id(Value, TrUserData), Bin),
-    e_pfield_Package_yanked(Rest, Bin2, TrUserData);
-e_pfield_Package_yanked([], Bin, _TrUserData) -> Bin.
+    e_pfield_Package_retired(Rest, Bin2, TrUserData);
+e_pfield_Package_retired([], Bin, _TrUserData) -> Bin.
 
 e_mfield_Versions_packages(Msg, Bin, TrUserData) ->
     SubBin = e_msg_Package(Msg, <<>>, TrUserData),
@@ -179,7 +179,7 @@ dfp_read_field_def_Package(<<18, Rest/binary>>, Z1, Z2,
 			     TrUserData);
 dfp_read_field_def_Package(<<26, Rest/binary>>, Z1, Z2,
 			   F1, F2, F3, F4, TrUserData) ->
-    d_field_Package_yanked(Rest, Z1, Z2, F1, F2, F3, F4,
+    d_field_Package_retired(Rest, Z1, Z2, F1, F2, F3, F4,
 			   TrUserData);
 dfp_read_field_def_Package(<<34, Rest/binary>>, Z1, Z2,
 			   F1, F2, F3, F4, TrUserData) ->
@@ -189,7 +189,7 @@ dfp_read_field_def_Package(<<>>, 0, 0, F1, F2, F3, F4,
 			   TrUserData) ->
     S1 = #{name => F1,
 	   versions => lists_reverse(F2, TrUserData),
-	   yanked => lists_reverse(F3, TrUserData)},
+	   retired => lists_reverse(F3, TrUserData)},
     if F4 == '$undef' -> S1;
        true -> S1#{namespace => F4}
     end;
@@ -214,7 +214,7 @@ dg_read_field_def_Package(<<0:1, X:7, Rest/binary>>, N,
 	  d_field_Package_versions(Rest, 0, 0, F1, F2, F3, F4,
 				   TrUserData);
       26 ->
-	  d_field_Package_yanked(Rest, 0, 0, F1, F2, F3, F4,
+	  d_field_Package_retired(Rest, 0, 0, F1, F2, F3, F4,
 				 TrUserData);
       34 ->
 	  d_field_Package_namespace(Rest, 0, 0, F1, F2, F3, F4,
@@ -237,7 +237,7 @@ dg_read_field_def_Package(<<>>, 0, 0, F1, F2, F3, F4,
 			  TrUserData) ->
     S1 = #{name => F1,
 	   versions => lists_reverse(F2, TrUserData),
-	   yanked => lists_reverse(F3, TrUserData)},
+	   retired => lists_reverse(F3, TrUserData)},
     if F4 == '$undef' -> S1;
        true -> S1#{namespace => F4}
     end.
@@ -271,33 +271,33 @@ d_field_Package_versions(<<0:1, X:7, Rest/binary>>, N,
 			       TrUserData).
 
 
-d_field_Package_yanked(<<1:1, X:7, Rest/binary>>, N,
+d_field_Package_retired(<<1:1, X:7, Rest/binary>>, N,
 		       Acc, F1, F2, F3, F4, TrUserData)
     when N < 57 ->
-    d_field_Package_yanked(Rest, N + 7, X bsl N + Acc, F1,
+    d_field_Package_retired(Rest, N + 7, X bsl N + Acc, F1,
 			   F2, F3, F4, TrUserData);
-d_field_Package_yanked(<<0:1, X:7, Rest/binary>>, N,
+d_field_Package_retired(<<0:1, X:7, Rest/binary>>, N,
 		       Acc, F1, F2, F3, F4, TrUserData) ->
     Len = X bsl N + Acc,
     <<PackedBytes:Len/binary, Rest2/binary>> = Rest,
-    NewSeq = d_packed_field_Package_yanked(PackedBytes, 0,
+    NewSeq = d_packed_field_Package_retired(PackedBytes, 0,
 					   0, F3),
     dfp_read_field_def_Package(Rest2, 0, 0, F1, F2, NewSeq,
 			       F4, TrUserData).
 
 
-d_packed_field_Package_yanked(<<1:1, X:7, Rest/binary>>,
+d_packed_field_Package_retired(<<1:1, X:7, Rest/binary>>,
 			      N, Acc, AccSeq)
     when N < 57 ->
-    d_packed_field_Package_yanked(Rest, N + 7,
+    d_packed_field_Package_retired(Rest, N + 7,
 				  X bsl N + Acc, AccSeq);
-d_packed_field_Package_yanked(<<0:1, X:7, Rest/binary>>,
+d_packed_field_Package_retired(<<0:1, X:7, Rest/binary>>,
 			      N, Acc, AccSeq) ->
     <<NewFValue:32/signed-native>> = <<(X bsl N +
 					  Acc):32/unsigned-native>>,
-    d_packed_field_Package_yanked(Rest, 0, 0,
+    d_packed_field_Package_retired(Rest, 0, 0,
 				  [NewFValue | AccSeq]);
-d_packed_field_Package_yanked(<<>>, 0, 0, AccSeq) ->
+d_packed_field_Package_retired(<<>>, 0, 0, AccSeq) ->
     AccSeq.
 
 
@@ -456,10 +456,10 @@ merge_msgs(Prev, New, MsgName, Opts) ->
     end.
 
 merge_msg_Package(#{name := PFname,
-		    versions := PFversions, yanked := PFyanked} =
+		    versions := PFversions, retired := PFretired} =
 		      PMsg,
 		  #{name := NFname, versions := NFversions,
-		    yanked := NFyanked} =
+		    retired := NFretired} =
 		      NMsg,
 		  TrUserData) ->
     S1 = #{name =>
@@ -468,7 +468,7 @@ merge_msg_Package(#{name := PFname,
 	       end,
 	   versions =>
 	       'erlang_++'(PFversions, NFversions, TrUserData),
-	   yanked => 'erlang_++'(PFyanked, NFyanked, TrUserData)},
+	   retired => 'erlang_++'(PFretired, NFretired, TrUserData)},
     case {PMsg, NMsg} of
       {_, #{namespace := NFnamespace}} ->
 	  S1#{namespace => NFnamespace};
@@ -500,7 +500,7 @@ verify_msg(Msg, MsgName, Opts) ->
 
 -dialyzer({nowarn_function,v_msg_Package/3}).
 v_msg_Package(#{name := F1, versions := F2,
-		yanked := F3} =
+		retired := F3} =
 		  M,
 	      Path, _) ->
     v_type_string(F1, [name | Path]),
@@ -512,7 +512,7 @@ v_msg_Package(#{name := F1, versions := F2,
 	   mk_type_error({invalid_list_of, string}, F2, Path)
     end,
     if is_list(F3) ->
-	   _ = [v_type_int32(Elem, [yanked | Path]) || Elem <- F3],
+	   _ = [v_type_int32(Elem, [retired | Path]) || Elem <- F3],
 	   ok;
        true ->
 	   mk_type_error({invalid_list_of, int32}, F3, Path)
@@ -525,7 +525,7 @@ v_msg_Package(#{name := F1, versions := F2,
     ok;
 v_msg_Package(M, Path, _TrUserData) when is_map(M) ->
     mk_type_error({missing_fields,
-		   [name, versions, yanked] -- maps:keys(M), 'Package'},
+		   [name, versions, retired] -- maps:keys(M), 'Package'},
 		  M, Path);
 v_msg_Package(X, Path, _TrUserData) ->
     mk_type_error({expected_msg, 'Package'}, X, Path).
@@ -611,7 +611,7 @@ get_msg_defs() ->
 	 occurrence => required, opts => []},
        #{name => versions, fnum => 2, rnum => 3,
 	 type => string, occurrence => repeated, opts => []},
-       #{name => yanked, fnum => 3, rnum => 4, type => int32,
+       #{name => retired, fnum => 3, rnum => 4, type => int32,
 	 occurrence => repeated, opts => [packed]},
        #{name => namespace, fnum => 4, rnum => 5,
 	 type => string, occurrence => optional, opts => []}]},
@@ -644,7 +644,7 @@ find_msg_def('Package') ->
        occurrence => required, opts => []},
      #{name => versions, fnum => 2, rnum => 3,
        type => string, occurrence => repeated, opts => []},
-     #{name => yanked, fnum => 3, rnum => 4, type => int32,
+     #{name => retired, fnum => 3, rnum => 4, type => int32,
        occurrence => repeated, opts => [packed]},
      #{name => namespace, fnum => 4, rnum => 5,
        type => string, occurrence => optional, opts => []}];

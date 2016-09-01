@@ -15,7 +15,7 @@
 -export([find_msg_def/1, fetch_msg_def/1]).
 -export([find_enum_def/1, fetch_enum_def/1]).
 -export([enum_symbol_by_value/2, enum_value_by_symbol/2]).
--export([enum_symbol_by_value_YankReason/1, enum_value_by_symbol_YankReason/1]).
+-export([enum_symbol_by_value_RetirementReason/1, enum_value_by_symbol_RetirementReason/1]).
 -export([get_service_names/0]).
 -export([get_service_def/1]).
 -export([get_rpc_names/1]).
@@ -35,7 +35,7 @@ encode_msg(Msg, MsgName, Opts) ->
     verify_msg(Msg, MsgName, Opts),
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
-      'YankStatus' -> e_msg_YankStatus(Msg, TrUserData);
+      'RetirementStatus' -> e_msg_RetirementStatus(Msg, TrUserData);
       'Dependency' -> e_msg_Dependency(Msg, TrUserData);
       'Release' -> e_msg_Release(Msg, TrUserData);
       'Package' -> e_msg_Package(Msg, TrUserData)
@@ -48,15 +48,15 @@ encode(_Msg) ->
 		  epb_compat_not_possible_with_maps}).
 
 
-e_msg_YankStatus(Msg, TrUserData) ->
-    e_msg_YankStatus(Msg, <<>>, TrUserData).
+e_msg_RetirementStatus(Msg, TrUserData) ->
+    e_msg_RetirementStatus(Msg, <<>>, TrUserData).
 
 
-e_msg_YankStatus(#{reason := F1} = M, Bin,
+e_msg_RetirementStatus(#{reason := F1} = M, Bin,
 		 TrUserData) ->
     B1 = begin
 	   TrF1 = id(F1, TrUserData),
-	   e_enum_YankReason(TrF1, <<Bin/binary, 8>>)
+	   e_enum_RetirementReason(TrF1, <<Bin/binary, 8>>)
 	 end,
     case M of
       #{message := F2} ->
@@ -117,9 +117,9 @@ e_msg_Release(#{version := F1, checksum := F2,
 	   end
 	 end,
     case M of
-      #{yanked := F4} ->
+      #{retired := F4} ->
 	  TrF4 = id(F4, TrUserData),
-	  e_mfield_Release_yanked(TrF4, <<B3/binary, 34>>,
+	  e_mfield_Release_retired(TrF4, <<B3/binary, 34>>,
 				  TrUserData);
       _ -> B3
     end.
@@ -151,8 +151,8 @@ e_field_Release_dependencies([Elem | Rest], Bin,
 e_field_Release_dependencies([], Bin, _TrUserData) ->
     Bin.
 
-e_mfield_Release_yanked(Msg, Bin, TrUserData) ->
-    SubBin = e_msg_YankStatus(Msg, <<>>, TrUserData),
+e_mfield_Release_retired(Msg, Bin, TrUserData) ->
+    SubBin = e_msg_RetirementStatus(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
 
@@ -171,17 +171,17 @@ e_field_Package_releases([], Bin, _TrUserData) -> Bin.
 
 
 
-e_enum_YankReason('YANKED_OTHER', Bin) ->
+e_enum_RetirementReason('RETIRED_OTHER', Bin) ->
     <<Bin/binary, 0>>;
-e_enum_YankReason('YANKED_INVALID', Bin) ->
+e_enum_RetirementReason('RETIRED_INVALID', Bin) ->
     <<Bin/binary, 1>>;
-e_enum_YankReason('YANKED_SECURITY', Bin) ->
+e_enum_RetirementReason('RETIRED_SECURITY', Bin) ->
     <<Bin/binary, 2>>;
-e_enum_YankReason('YANKED_DEPRECATED', Bin) ->
+e_enum_RetirementReason('RETIRED_DEPRECATED', Bin) ->
     <<Bin/binary, 3>>;
-e_enum_YankReason('YANKED_RENAMED', Bin) ->
+e_enum_RetirementReason('RETIRED_RENAMED', Bin) ->
     <<Bin/binary, 4>>;
-e_enum_YankReason(V, Bin) -> e_varint(V, Bin).
+e_enum_RetirementReason(V, Bin) -> e_varint(V, Bin).
 
 e_type_bool(true, Bin) -> <<Bin/binary, 1>>;
 e_type_bool(false, Bin) -> <<Bin/binary, 0>>;
@@ -214,7 +214,7 @@ decode_msg(Bin, MsgName) when is_binary(Bin) ->
 decode_msg(Bin, MsgName, Opts) when is_binary(Bin) ->
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
-      'YankStatus' -> d_msg_YankStatus(Bin, TrUserData);
+      'RetirementStatus' -> d_msg_RetirementStatus(Bin, TrUserData);
       'Dependency' -> d_msg_Dependency(Bin, TrUserData);
       'Release' -> d_msg_Release(Bin, TrUserData);
       'Package' -> d_msg_Package(Bin, TrUserData)
@@ -229,123 +229,123 @@ decode(MsgName, Bin)
 
 
 
-d_msg_YankStatus(Bin, TrUserData) ->
-    dfp_read_field_def_YankStatus(Bin, 0, 0,
+d_msg_RetirementStatus(Bin, TrUserData) ->
+    dfp_read_field_def_RetirementStatus(Bin, 0, 0,
 				  id('$undef', TrUserData),
 				  id('$undef', TrUserData), TrUserData).
 
-dfp_read_field_def_YankStatus(<<8, Rest/binary>>, Z1,
+dfp_read_field_def_RetirementStatus(<<8, Rest/binary>>, Z1,
 			      Z2, F1, F2, TrUserData) ->
-    d_field_YankStatus_reason(Rest, Z1, Z2, F1, F2,
+    d_field_RetirementStatus_reason(Rest, Z1, Z2, F1, F2,
 			      TrUserData);
-dfp_read_field_def_YankStatus(<<18, Rest/binary>>, Z1,
+dfp_read_field_def_RetirementStatus(<<18, Rest/binary>>, Z1,
 			      Z2, F1, F2, TrUserData) ->
-    d_field_YankStatus_message(Rest, Z1, Z2, F1, F2,
+    d_field_RetirementStatus_message(Rest, Z1, Z2, F1, F2,
 			       TrUserData);
-dfp_read_field_def_YankStatus(<<>>, 0, 0, F1, F2, _) ->
+dfp_read_field_def_RetirementStatus(<<>>, 0, 0, F1, F2, _) ->
     S1 = #{reason => F1},
     if F2 == '$undef' -> S1;
        true -> S1#{message => F2}
     end;
-dfp_read_field_def_YankStatus(Other, Z1, Z2, F1, F2,
+dfp_read_field_def_RetirementStatus(Other, Z1, Z2, F1, F2,
 			      TrUserData) ->
-    dg_read_field_def_YankStatus(Other, Z1, Z2, F1, F2,
+    dg_read_field_def_RetirementStatus(Other, Z1, Z2, F1, F2,
 				 TrUserData).
 
-dg_read_field_def_YankStatus(<<1:1, X:7, Rest/binary>>,
+dg_read_field_def_RetirementStatus(<<1:1, X:7, Rest/binary>>,
 			     N, Acc, F1, F2, TrUserData)
     when N < 32 - 7 ->
-    dg_read_field_def_YankStatus(Rest, N + 7, X bsl N + Acc,
+    dg_read_field_def_RetirementStatus(Rest, N + 7, X bsl N + Acc,
 				 F1, F2, TrUserData);
-dg_read_field_def_YankStatus(<<0:1, X:7, Rest/binary>>,
+dg_read_field_def_RetirementStatus(<<0:1, X:7, Rest/binary>>,
 			     N, Acc, F1, F2, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
       8 ->
-	  d_field_YankStatus_reason(Rest, 0, 0, F1, F2,
+	  d_field_RetirementStatus_reason(Rest, 0, 0, F1, F2,
 				    TrUserData);
       18 ->
-	  d_field_YankStatus_message(Rest, 0, 0, F1, F2,
+	  d_field_RetirementStatus_message(Rest, 0, 0, F1, F2,
 				     TrUserData);
       _ ->
 	  case Key band 7 of
 	    0 ->
-		skip_varint_YankStatus(Rest, 0, 0, F1, F2, TrUserData);
-	    1 -> skip_64_YankStatus(Rest, 0, 0, F1, F2, TrUserData);
+		skip_varint_RetirementStatus(Rest, 0, 0, F1, F2, TrUserData);
+	    1 -> skip_64_RetirementStatus(Rest, 0, 0, F1, F2, TrUserData);
 	    2 ->
-		skip_length_delimited_YankStatus(Rest, 0, 0, F1, F2,
+		skip_length_delimited_RetirementStatus(Rest, 0, 0, F1, F2,
 						 TrUserData);
-	    5 -> skip_32_YankStatus(Rest, 0, 0, F1, F2, TrUserData)
+	    5 -> skip_32_RetirementStatus(Rest, 0, 0, F1, F2, TrUserData)
 	  end
     end;
-dg_read_field_def_YankStatus(<<>>, 0, 0, F1, F2, _) ->
+dg_read_field_def_RetirementStatus(<<>>, 0, 0, F1, F2, _) ->
     S1 = #{reason => F1},
     if F2 == '$undef' -> S1;
        true -> S1#{message => F2}
     end.
 
-d_field_YankStatus_reason(<<1:1, X:7, Rest/binary>>, N,
+d_field_RetirementStatus_reason(<<1:1, X:7, Rest/binary>>, N,
 			  Acc, F1, F2, TrUserData)
     when N < 57 ->
-    d_field_YankStatus_reason(Rest, N + 7, X bsl N + Acc,
+    d_field_RetirementStatus_reason(Rest, N + 7, X bsl N + Acc,
 			      F1, F2, TrUserData);
-d_field_YankStatus_reason(<<0:1, X:7, Rest/binary>>, N,
+d_field_RetirementStatus_reason(<<0:1, X:7, Rest/binary>>, N,
 			  Acc, _, F2, TrUserData) ->
     <<Tmp:32/signed-native>> = <<(X bsl N +
 				    Acc):32/unsigned-native>>,
-    NewFValue = d_enum_YankReason(Tmp),
-    dfp_read_field_def_YankStatus(Rest, 0, 0, NewFValue, F2,
+    NewFValue = d_enum_RetirementReason(Tmp),
+    dfp_read_field_def_RetirementStatus(Rest, 0, 0, NewFValue, F2,
 				  TrUserData).
 
 
-d_field_YankStatus_message(<<1:1, X:7, Rest/binary>>, N,
+d_field_RetirementStatus_message(<<1:1, X:7, Rest/binary>>, N,
 			   Acc, F1, F2, TrUserData)
     when N < 57 ->
-    d_field_YankStatus_message(Rest, N + 7, X bsl N + Acc,
+    d_field_RetirementStatus_message(Rest, N + 7, X bsl N + Acc,
 			       F1, F2, TrUserData);
-d_field_YankStatus_message(<<0:1, X:7, Rest/binary>>, N,
+d_field_RetirementStatus_message(<<0:1, X:7, Rest/binary>>, N,
 			   Acc, F1, _, TrUserData) ->
     Len = X bsl N + Acc,
     <<Bytes:Len/binary, Rest2/binary>> = Rest,
     NewFValue = binary:copy(Bytes),
-    dfp_read_field_def_YankStatus(Rest2, 0, 0, F1,
+    dfp_read_field_def_RetirementStatus(Rest2, 0, 0, F1,
 				  NewFValue, TrUserData).
 
 
-skip_varint_YankStatus(<<1:1, _:7, Rest/binary>>, Z1,
+skip_varint_RetirementStatus(<<1:1, _:7, Rest/binary>>, Z1,
 		       Z2, F1, F2, TrUserData) ->
-    skip_varint_YankStatus(Rest, Z1, Z2, F1, F2,
+    skip_varint_RetirementStatus(Rest, Z1, Z2, F1, F2,
 			   TrUserData);
-skip_varint_YankStatus(<<0:1, _:7, Rest/binary>>, Z1,
+skip_varint_RetirementStatus(<<0:1, _:7, Rest/binary>>, Z1,
 		       Z2, F1, F2, TrUserData) ->
-    dfp_read_field_def_YankStatus(Rest, Z1, Z2, F1, F2,
+    dfp_read_field_def_RetirementStatus(Rest, Z1, Z2, F1, F2,
 				  TrUserData).
 
 
-skip_length_delimited_YankStatus(<<1:1, X:7,
+skip_length_delimited_RetirementStatus(<<1:1, X:7,
 				   Rest/binary>>,
 				 N, Acc, F1, F2, TrUserData)
     when N < 57 ->
-    skip_length_delimited_YankStatus(Rest, N + 7,
+    skip_length_delimited_RetirementStatus(Rest, N + 7,
 				     X bsl N + Acc, F1, F2, TrUserData);
-skip_length_delimited_YankStatus(<<0:1, X:7,
+skip_length_delimited_RetirementStatus(<<0:1, X:7,
 				   Rest/binary>>,
 				 N, Acc, F1, F2, TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
-    dfp_read_field_def_YankStatus(Rest2, 0, 0, F1, F2,
+    dfp_read_field_def_RetirementStatus(Rest2, 0, 0, F1, F2,
 				  TrUserData).
 
 
-skip_32_YankStatus(<<_:32, Rest/binary>>, Z1, Z2, F1,
+skip_32_RetirementStatus(<<_:32, Rest/binary>>, Z1, Z2, F1,
 		   F2, TrUserData) ->
-    dfp_read_field_def_YankStatus(Rest, Z1, Z2, F1, F2,
+    dfp_read_field_def_RetirementStatus(Rest, Z1, Z2, F1, F2,
 				  TrUserData).
 
 
-skip_64_YankStatus(<<_:64, Rest/binary>>, Z1, Z2, F1,
+skip_64_RetirementStatus(<<_:64, Rest/binary>>, Z1, Z2, F1,
 		   F2, TrUserData) ->
-    dfp_read_field_def_YankStatus(Rest, Z1, Z2, F1, F2,
+    dfp_read_field_def_RetirementStatus(Rest, Z1, Z2, F1, F2,
 				  TrUserData).
 
 
@@ -546,14 +546,14 @@ dfp_read_field_def_Release(<<26, Rest/binary>>, Z1, Z2,
 				 F4, TrUserData);
 dfp_read_field_def_Release(<<34, Rest/binary>>, Z1, Z2,
 			   F1, F2, F3, F4, TrUserData) ->
-    d_field_Release_yanked(Rest, Z1, Z2, F1, F2, F3, F4,
+    d_field_Release_retired(Rest, Z1, Z2, F1, F2, F3, F4,
 			   TrUserData);
 dfp_read_field_def_Release(<<>>, 0, 0, F1, F2, F3, F4,
 			   TrUserData) ->
     S1 = #{version => F1, checksum => F2,
 	   dependencies => lists_reverse(F3, TrUserData)},
     if F4 == '$undef' -> S1;
-       true -> S1#{yanked => F4}
+       true -> S1#{retired => F4}
     end;
 dfp_read_field_def_Release(Other, Z1, Z2, F1, F2, F3,
 			   F4, TrUserData) ->
@@ -579,7 +579,7 @@ dg_read_field_def_Release(<<0:1, X:7, Rest/binary>>, N,
 	  d_field_Release_dependencies(Rest, 0, 0, F1, F2, F3, F4,
 				       TrUserData);
       34 ->
-	  d_field_Release_yanked(Rest, 0, 0, F1, F2, F3, F4,
+	  d_field_Release_retired(Rest, 0, 0, F1, F2, F3, F4,
 				 TrUserData);
       _ ->
 	  case Key band 7 of
@@ -600,7 +600,7 @@ dg_read_field_def_Release(<<>>, 0, 0, F1, F2, F3, F4,
     S1 = #{version => F1, checksum => F2,
 	   dependencies => lists_reverse(F3, TrUserData)},
     if F4 == '$undef' -> S1;
-       true -> S1#{yanked => F4}
+       true -> S1#{retired => F4}
     end.
 
 d_field_Release_version(<<1:1, X:7, Rest/binary>>, N,
@@ -646,21 +646,21 @@ d_field_Release_dependencies(<<0:1, X:7, Rest/binary>>,
 			       cons(NewFValue, F3, TrUserData), F4, TrUserData).
 
 
-d_field_Release_yanked(<<1:1, X:7, Rest/binary>>, N,
+d_field_Release_retired(<<1:1, X:7, Rest/binary>>, N,
 		       Acc, F1, F2, F3, F4, TrUserData)
     when N < 57 ->
-    d_field_Release_yanked(Rest, N + 7, X bsl N + Acc, F1,
+    d_field_Release_retired(Rest, N + 7, X bsl N + Acc, F1,
 			   F2, F3, F4, TrUserData);
-d_field_Release_yanked(<<0:1, X:7, Rest/binary>>, N,
+d_field_Release_retired(<<0:1, X:7, Rest/binary>>, N,
 		       Acc, F1, F2, F3, F4, TrUserData) ->
     Len = X bsl N + Acc,
     <<Bs:Len/binary, Rest2/binary>> = Rest,
-    NewFValue = id(d_msg_YankStatus(Bs, TrUserData),
+    NewFValue = id(d_msg_RetirementStatus(Bs, TrUserData),
 		   TrUserData),
     dfp_read_field_def_Release(Rest2, 0, 0, F1, F2, F3,
 			       if F4 =:= '$undef' -> NewFValue;
 				  true ->
-				      merge_msg_YankStatus(F4, NewFValue,
+				      merge_msg_RetirementStatus(F4, NewFValue,
 							   TrUserData)
 			       end,
 			       TrUserData).
@@ -790,12 +790,12 @@ skip_64_Package(<<_:64, Rest/binary>>, Z1, Z2, F1,
 
 
 
-d_enum_YankReason(0) -> 'YANKED_OTHER';
-d_enum_YankReason(1) -> 'YANKED_INVALID';
-d_enum_YankReason(2) -> 'YANKED_SECURITY';
-d_enum_YankReason(3) -> 'YANKED_DEPRECATED';
-d_enum_YankReason(4) -> 'YANKED_RENAMED';
-d_enum_YankReason(V) -> V.
+d_enum_RetirementReason(0) -> 'RETIRED_OTHER';
+d_enum_RetirementReason(1) -> 'RETIRED_INVALID';
+d_enum_RetirementReason(2) -> 'RETIRED_SECURITY';
+d_enum_RetirementReason(3) -> 'RETIRED_DEPRECATED';
+d_enum_RetirementReason(4) -> 'RETIRED_RENAMED';
+d_enum_RetirementReason(V) -> V.
 
 
 
@@ -805,15 +805,15 @@ merge_msgs(Prev, New, MsgName) ->
 merge_msgs(Prev, New, MsgName, Opts) ->
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
-      'YankStatus' ->
-	  merge_msg_YankStatus(Prev, New, TrUserData);
+      'RetirementStatus' ->
+	  merge_msg_RetirementStatus(Prev, New, TrUserData);
       'Dependency' ->
 	  merge_msg_Dependency(Prev, New, TrUserData);
       'Release' -> merge_msg_Release(Prev, New, TrUserData);
       'Package' -> merge_msg_Package(Prev, New, TrUserData)
     end.
 
-merge_msg_YankStatus(#{reason := PFreason} = PMsg,
+merge_msg_RetirementStatus(#{reason := PFreason} = PMsg,
 		     #{reason := NFreason} = NMsg, _) ->
     S1 = #{reason =>
 	       if NFreason =:= undefined -> PFreason;
@@ -874,11 +874,11 @@ merge_msg_Release(#{version := PFversion,
 	       'erlang_++'(PFdependencies, NFdependencies,
 			   TrUserData)},
     case {PMsg, NMsg} of
-      {#{yanked := PFyanked}, #{yanked := NFyanked}} ->
-	  S1#{yanked =>
-		  merge_msg_YankStatus(PFyanked, NFyanked, TrUserData)};
-      {_, #{yanked := NFyanked}} -> S1#{yanked => NFyanked};
-      {#{yanked := PFyanked}, _} -> S1#{yanked => PFyanked};
+      {#{retired := PFretired}, #{retired := NFretired}} ->
+	  S1#{retired =>
+		  merge_msg_RetirementStatus(PFretired, NFretired, TrUserData)};
+      {_, #{retired := NFretired}} -> S1#{retired => NFretired};
+      {#{retired := PFretired}, _} -> S1#{retired => PFretired};
       {_, _} -> S1
     end.
 
@@ -895,8 +895,8 @@ verify_msg(Msg, MsgName) ->
 verify_msg(Msg, MsgName, Opts) ->
     TrUserData = proplists:get_value(user_data, Opts),
     case MsgName of
-      'YankStatus' ->
-	  v_msg_YankStatus(Msg, ['YankStatus'], TrUserData);
+      'RetirementStatus' ->
+	  v_msg_RetirementStatus(Msg, ['RetirementStatus'], TrUserData);
       'Dependency' ->
 	  v_msg_Dependency(Msg, ['Dependency'], TrUserData);
       'Release' ->
@@ -907,20 +907,20 @@ verify_msg(Msg, MsgName, Opts) ->
     end.
 
 
--dialyzer({nowarn_function,v_msg_YankStatus/3}).
-v_msg_YankStatus(#{reason := F1} = M, Path, _) ->
-    v_enum_YankReason(F1, [reason | Path]),
+-dialyzer({nowarn_function,v_msg_RetirementStatus/3}).
+v_msg_RetirementStatus(#{reason := F1} = M, Path, _) ->
+    v_enum_RetirementReason(F1, [reason | Path]),
     case M of
       #{message := F2} -> v_type_string(F2, [message | Path]);
       _ -> ok
     end,
     ok;
-v_msg_YankStatus(M, Path, _TrUserData) when is_map(M) ->
+v_msg_RetirementStatus(M, Path, _TrUserData) when is_map(M) ->
     mk_type_error({missing_fields, [reason] -- maps:keys(M),
-		   'YankStatus'},
+		   'RetirementStatus'},
 		  M, Path);
-v_msg_YankStatus(X, Path, _TrUserData) ->
-    mk_type_error({expected_msg, 'YankStatus'}, X, Path).
+v_msg_RetirementStatus(X, Path, _TrUserData) ->
+    mk_type_error({expected_msg, 'RetirementStatus'}, X, Path).
 
 -dialyzer({nowarn_function,v_msg_Dependency/3}).
 v_msg_Dependency(#{package := F1, requirement := F2} =
@@ -961,8 +961,8 @@ v_msg_Release(#{version := F1, checksum := F2,
 			 F3, Path)
     end,
     case M of
-      #{yanked := F4} ->
-	  v_msg_YankStatus(F4, [yanked | Path], TrUserData);
+      #{retired := F4} ->
+	  v_msg_RetirementStatus(F4, [retired | Path], TrUserData);
       _ -> ok
     end,
     ok;
@@ -992,16 +992,16 @@ v_msg_Package(M, Path, _TrUserData) when is_map(M) ->
 v_msg_Package(X, Path, _TrUserData) ->
     mk_type_error({expected_msg, 'Package'}, X, Path).
 
--dialyzer({nowarn_function,v_enum_YankReason/2}).
-v_enum_YankReason('YANKED_OTHER', _Path) -> ok;
-v_enum_YankReason('YANKED_INVALID', _Path) -> ok;
-v_enum_YankReason('YANKED_SECURITY', _Path) -> ok;
-v_enum_YankReason('YANKED_DEPRECATED', _Path) -> ok;
-v_enum_YankReason('YANKED_RENAMED', _Path) -> ok;
-v_enum_YankReason(V, Path) when is_integer(V) ->
+-dialyzer({nowarn_function,v_enum_RetirementReason/2}).
+v_enum_RetirementReason('RETIRED_OTHER', _Path) -> ok;
+v_enum_RetirementReason('RETIRED_INVALID', _Path) -> ok;
+v_enum_RetirementReason('RETIRED_SECURITY', _Path) -> ok;
+v_enum_RetirementReason('RETIRED_DEPRECATED', _Path) -> ok;
+v_enum_RetirementReason('RETIRED_RENAMED', _Path) -> ok;
+v_enum_RetirementReason(V, Path) when is_integer(V) ->
     v_type_sint32(V, Path);
-v_enum_YankReason(X, Path) ->
-    mk_type_error({invalid_enum, 'YankReason'}, X, Path).
+v_enum_RetirementReason(X, Path) ->
+    mk_type_error({invalid_enum, 'RetirementReason'}, X, Path).
 
 -dialyzer({nowarn_function,v_type_sint32/2}).
 v_type_sint32(N, _Path)
@@ -1075,13 +1075,13 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 
 
 get_msg_defs() ->
-    [{{enum, 'YankReason'},
-      [{'YANKED_OTHER', 0}, {'YANKED_INVALID', 1},
-       {'YANKED_SECURITY', 2}, {'YANKED_DEPRECATED', 3},
-       {'YANKED_RENAMED', 4}]},
-     {{msg, 'YankStatus'},
+    [{{enum, 'RetirementReason'},
+      [{'RETIRED_OTHER', 0}, {'RETIRED_INVALID', 1},
+       {'RETIRED_SECURITY', 2}, {'RETIRED_DEPRECATED', 3},
+       {'RETIRED_RENAMED', 4}]},
+     {{msg, 'RetirementStatus'},
       [#{name => reason, fnum => 1, rnum => 2,
-	 type => {enum, 'YankReason'}, occurrence => required,
+	 type => {enum, 'RetirementReason'}, occurrence => required,
 	 opts => []},
        #{name => message, fnum => 2, rnum => 3, type => string,
 	 occurrence => optional, opts => []}]},
@@ -1102,8 +1102,8 @@ get_msg_defs() ->
        #{name => dependencies, fnum => 3, rnum => 4,
 	 type => {msg, 'Dependency'}, occurrence => repeated,
 	 opts => []},
-       #{name => yanked, fnum => 4, rnum => 5,
-	 type => {msg, 'YankStatus'}, occurrence => optional,
+       #{name => retired, fnum => 4, rnum => 5,
+	 type => {msg, 'RetirementStatus'}, occurrence => optional,
 	 opts => []}]},
      {{msg, 'Package'},
       [#{name => releases, fnum => 1, rnum => 2,
@@ -1112,10 +1112,10 @@ get_msg_defs() ->
 
 
 get_msg_names() ->
-    ['YankStatus', 'Dependency', 'Release', 'Package'].
+    ['RetirementStatus', 'Dependency', 'Release', 'Package'].
 
 
-get_enum_names() -> ['YankReason'].
+get_enum_names() -> ['RetirementReason'].
 
 
 fetch_msg_def(MsgName) ->
@@ -1132,9 +1132,9 @@ fetch_enum_def(EnumName) ->
     end.
 
 
-find_msg_def('YankStatus') ->
+find_msg_def('RetirementStatus') ->
     [#{name => reason, fnum => 1, rnum => 2,
-       type => {enum, 'YankReason'}, occurrence => required,
+       type => {enum, 'RetirementReason'}, occurrence => required,
        opts => []},
      #{name => message, fnum => 2, rnum => 3, type => string,
        occurrence => optional, opts => []}];
@@ -1155,8 +1155,8 @@ find_msg_def('Release') ->
      #{name => dependencies, fnum => 3, rnum => 4,
        type => {msg, 'Dependency'}, occurrence => repeated,
        opts => []},
-     #{name => yanked, fnum => 4, rnum => 5,
-       type => {msg, 'YankStatus'}, occurrence => optional,
+     #{name => retired, fnum => 4, rnum => 5,
+       type => {msg, 'RetirementStatus'}, occurrence => optional,
        opts => []}];
 find_msg_def('Package') ->
     [#{name => releases, fnum => 1, rnum => 2,
@@ -1165,35 +1165,33 @@ find_msg_def('Package') ->
 find_msg_def(_) -> error.
 
 
-find_enum_def('YankReason') ->
-    [{'YANKED_OTHER', 0}, {'YANKED_INVALID', 1},
-     {'YANKED_SECURITY', 2}, {'YANKED_DEPRECATED', 3},
-     {'YANKED_RENAMED', 4}];
+find_enum_def('RetirementReason') ->
+    [{'RETIRED_OTHER', 0}, {'RETIRED_INVALID', 1},
+     {'RETIRED_SECURITY', 2}, {'RETIRED_DEPRECATED', 3},
+     {'RETIRED_RENAMED', 4}];
 find_enum_def(_) -> error.
 
 
-enum_symbol_by_value('YankReason', Value) ->
-    enum_symbol_by_value_YankReason(Value).
+enum_symbol_by_value('RetirementReason', Value) ->
+    enum_symbol_by_value_RetirementReason(Value).
 
 
-enum_value_by_symbol('YankReason', Sym) ->
-    enum_value_by_symbol_YankReason(Sym).
+enum_value_by_symbol('RetirementReason', Sym) ->
+    enum_value_by_symbol_RetirementReason(Sym).
 
 
-enum_symbol_by_value_YankReason(0) -> 'YANKED_OTHER';
-enum_symbol_by_value_YankReason(1) -> 'YANKED_INVALID';
-enum_symbol_by_value_YankReason(2) -> 'YANKED_SECURITY';
-enum_symbol_by_value_YankReason(3) ->
-    'YANKED_DEPRECATED';
-enum_symbol_by_value_YankReason(4) -> 'YANKED_RENAMED'.
+enum_symbol_by_value_RetirementReason(0) -> 'RETIRED_OTHER';
+enum_symbol_by_value_RetirementReason(1) -> 'RETIRED_INVALID';
+enum_symbol_by_value_RetirementReason(2) -> 'RETIRED_SECURITY';
+enum_symbol_by_value_RetirementReason(3) -> 'RETIRED_DEPRECATED';
+enum_symbol_by_value_RetirementReason(4) -> 'RETIRED_RENAMED'.
 
 
-enum_value_by_symbol_YankReason('YANKED_OTHER') -> 0;
-enum_value_by_symbol_YankReason('YANKED_INVALID') -> 1;
-enum_value_by_symbol_YankReason('YANKED_SECURITY') -> 2;
-enum_value_by_symbol_YankReason('YANKED_DEPRECATED') ->
-    3;
-enum_value_by_symbol_YankReason('YANKED_RENAMED') -> 4.
+enum_value_by_symbol_RetirementReason('RETIRED_OTHER') -> 0;
+enum_value_by_symbol_RetirementReason('RETIRED_INVALID') -> 1;
+enum_value_by_symbol_RetirementReason('RETIRED_SECURITY') -> 2;
+enum_value_by_symbol_RetirementReason('RETIRED_DEPRECATED') -> 3;
+enum_value_by_symbol_RetirementReason('RETIRED_RENAMED') -> 4.
 
 
 get_service_names() -> [].
