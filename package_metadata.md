@@ -39,15 +39,11 @@ All keys are strings.
 
   + `licenses (list(string))`
 
-    The library's licenses
+    The package's licenses
 
-  + `contributors (list(string))`
+  + `maintainers (list(string))`
 
-    The library's maintainers, can be a list of names and/or emails
-
-    NOTE: This field is deprecated and will change name to `maintainers`, new packages
-    should use `maintainers` but old packages will use `contributors` until the conversion
-    happens
+    The package's maintainers, can be a list of names and/or emails
 
   + `links (kvlist(string => string))`
 
