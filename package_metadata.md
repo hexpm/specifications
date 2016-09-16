@@ -17,39 +17,39 @@ kvlists are normally generic in the sense that they can have any values for keys
 
 All keys are strings.
 
-  + `name (string)`
+  + `name (string) (required)`
 
     Package name
 
-  + `version (string)`
+  + `version (string) (required)`
 
     Release version, required to be a [Semantic Version][]
 
-  + `app (string)`
+  + `app (string) (required)`
 
     OTP application name, usually the same name as the package but can differ
 
-  + `description (string)`
+  + `description (string) (required)`
 
     Package description, recommended to be a single paragraph
 
-  + `files (list(string))`
+  + `files (list(string)) (required)`
 
     Files in the package tarball contents
 
-  + `licenses (list(string))`
+  + `licenses (list(string)) (required)`
 
     The package's licenses
 
-  + `maintainers (list(string))`
+  + `maintainers (list(string)) (optional)`
 
     The package's maintainers, can be a list of names and/or emails
 
-  + `links (kvlist(string => string))`
+  + `links (kvlist(string => string)) (optional)`
 
     Links related to the package where the key is the link name and the value is the URL
 
-  + `requirements (kvlist(string => kvlist(...)))`
+  + `requirements (kvlist(string => kvlist(...))) (required)`
 
     All dependencies of the package where the key is the dependent name,
     all keys below are required
@@ -66,11 +66,11 @@ All keys are strings.
 
       [Version requirement][] on the dependent
 
-  + `build_tools (list(string))`
+  + `build_tools (list(string)) (required)`
 
       Names of build tools that can build the package
 
-  + `extra (kvlist(string => kvlist(...)))`
+  + `extra (kvlist(string => kvlist(...))) (optional)`
 
       Extra information about the package
 
