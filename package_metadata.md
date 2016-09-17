@@ -21,6 +21,10 @@ All keys are strings.
 
     Package name
 
+  + `elixir (string) (required)`
+
+    [Version requirement][] on Elixir
+
   + `version (string) (required)`
 
     Release version, required to be a [Semantic Version][]
