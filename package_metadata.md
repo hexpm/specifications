@@ -21,7 +21,7 @@ All keys are strings.
 
     Package name
 
-  + `elixir (string) (required)`
+  + `elixir (string) (optional)`
 
     [Version requirement][] on Elixir
 
