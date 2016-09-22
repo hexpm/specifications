@@ -8,4 +8,4 @@
 
 ## Repositories and mirrors
 
-To host a repository only the CDN endpoint has to be implemented.
+To host a repository only the [Repository endpoint](https://github.com/hexpm/specifications/blob/master/endpoints.md#repository) has to be implemented.
