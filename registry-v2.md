@@ -16,7 +16,9 @@ If you are on an Erlang system it is recommended to use the already generated fi
 [verify: :always,
  strings_as_binaries: true,
  maps: true,
- maps_unset_optional: :omitted]
+ maps_unset_optional: :omitted,
+ report_warnings: true,
+ target_erlang_version: 18]
 ```
 
 ### names.proto
@@ -104,6 +106,8 @@ message Dependency {
   // If set is the OTP application name of the dependency, if not set the
   // application name is the same as the package name
   optional string app = 4;
+  // If set, the namespace where the dependency is located
+  optional string namespace = 5;
 }
 ```
 
