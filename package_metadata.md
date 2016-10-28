@@ -20,10 +20,10 @@ All keys are strings.
   + `name (string) (required)`
 
     Package name
-    
-  + `namespace (string, optional)`
 
-    Package namespace
+  + `repository (string, optional)`
+
+    Package repository
 
   + `private (boolean, optional)`
 

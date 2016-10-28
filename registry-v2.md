@@ -106,8 +106,8 @@ message Dependency {
   // If set is the OTP application name of the dependency, if not set the
   // application name is the same as the package name
   optional string app = 4;
-  // If set, the namespace where the dependency is located
-  optional string namespace = 5;
+  // If set, the repository where the dependency is located
+  optional string repository = 5;
 }
 ```
 
@@ -132,22 +132,17 @@ Due to some packages requiring authentication to be visible different users may 
 
 ## Signing
 
-All resources will be signed by the repository's private key. A signed resource is wrapped in a `Signed` message. The data under the `payload`
-field is signed by the `signature` field.
+All resources will be signed by the repository's private key. A signed resource is wrapped in a `Signed` message. The data under the `payload` field is signed by the `signature` field.
 
 The signature is an (unencoded) RSA signature of the (unencoded) SHA-512 digest of the payload.
 
 Repositories are required to sign all registry resources.
 
-## Namespaces
+## Cross-repository dependencies
 
-Repositories may optionally support namespaces. A namespace can be seen as a sub-repository to the main repository or clients can map a namespace to a completely different repository. A namespaced resource is prefixed `@` and the namespace name as a path segment, it should expose the following endpoints:
+Dependencies can be located in another repository than where the parent package is fetched from. If the `repository` field is not set on the `Dependency` message the dependency is located in the same repository as the package. The `repository` field just holds the name of the repository, it is up to clients to map these names to other repository locations, for example an HTTP URL.
 
- * `/@NAMESPACE/names`
- * `/@NAMESPACE/versions`
- * `/@NAMESPACE/packages/NAME`
-
-If no namespace is specified in the `Dependency` message it should be assumed that the dependency is located in the same namespace as dependent package. The name for the official Hex.pm namespace is "hexpm" and should not be used by any other namespace.
+The name for the official Hex.pm repository is "hexpm", it should not be used by any other repository and should always map to to the repository endpoint specified in [endpoints](https://github.com/hexpm/specifications/blob/master/endpoints.md).
 
 ## Retiring Releases
 

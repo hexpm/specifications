@@ -8,10 +8,12 @@ See [apiary.apib](https://github.com/hexpm/specifications/blob/master/apiary.api
 
 ## Repository
 
-  * `/[@NAMESPACE/]names` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
-  * `/[@NAMESPACE/]versions` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
-  * `/[@NAMESPACE/]packages/PACKAGE` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
-  * `/tarballs/[@NAMESPACE/]PACKAGE-VERSION.tar` - [Package tarball](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
+### Endpoints
+
+  * `/names` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
+  * `/versions` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
+  * `/packages/PACKAGE` - [Registry v2](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
+  * `/tarballs/PACKAGE-VERSION.tar` - [Package tarball](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
   * `/registry.ets.gz` - [Registry v1](https://github.com/hexpm/specifications/blob/master/registry-v1.md) (DEPRECATED!)
   * `/registry.ets.gz.signed` - (optional) (DEPRECATED!)
 
@@ -27,7 +29,7 @@ A repository can optionally RSA sign its registry. The RSA public key should be 
 
 The signing is defined in the registry v2 specification as it is not part of the resource delivery.
 
-## Hex.pm endpoints
+## Hex.pm
 
 Hex.pm uses the following root endpoints:
 
@@ -35,3 +37,16 @@ Hex.pm uses the following root endpoints:
   * Repository - https://repo.hex.pm
   * Repository - https://hexpmrepo.global.ssl.fastly.net (DEPRECATED!)
   * Repository - https://s3.amazonaws.com/s3.hex.pm (DEPRECATED!)
+
+### Sub-repositories
+
+Hex.pm supports sub-repositories, they can be accessed at the following endpoints, where `REPO` is the repository name:
+
+  * `/@REPO/names`
+  * `/@REPO/versions`
+  * `/@REPO/packages/PACKAGE`
+  * `/@REPO/tarballs/PACKAGE-VERSION.tar`
+
+### Private key
+
+Go to https://hex.pm/docs/public_keys to get Hex.pm's public key used to sign the registry.
