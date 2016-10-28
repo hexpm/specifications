@@ -141,11 +141,13 @@ Repositories are required to sign all registry resources.
 
 ## Namespaces
 
-Repositories may optionally support namespaces. A namespace can be seen as a sub-repository to the main repository. A namespace resource is prefixed `@` and the namespace name as a path segment, it should expose the following endpoints:
+Repositories may optionally support namespaces. A namespace can be seen as a sub-repository to the main repository or clients can map a namespace to a completely different repository. A namespaced resource is prefixed `@` and the namespace name as a path segment, it should expose the following endpoints:
 
  * `/@NAMESPACE/names`
  * `/@NAMESPACE/versions`
  * `/@NAMESPACE/packages/NAME`
+
+If no namespace is specified in the `Dependency` message it should be assumed that the dependency is located in the same namespace as dependent package. The name for the official Hex.pm namespace is "hexpm" and should not be used by any other namespace.
 
 ## Retiring Releases
 
