@@ -36,8 +36,8 @@ message Names {
 message Package {
   // Package name
   required string name = 1;
-  // If set, the package namespace
-  optional string namespace = 2;
+  // If set, the name of the package repository
+  optional string repository = 2;
 }
 ```
 
@@ -60,8 +60,8 @@ message Package {
   repeated string versions = 2;
   // Zero-based indexes of retired versions in the versions field, see package.proto
   repeated int32 retired = 3 [packed=true];
-  // If set, the package namespace
-  optional string namespace = 4;
+  // If set, the name of the package repository
+  optional string repository = 4;
 }
 ```
 
@@ -136,7 +136,7 @@ message Signed {
 
 Depending on the repository configuration, the index resources `/names` and `/versions` may not include all packages. If the repository supports private package (such as hex.pm) they will not be included in the index resources, i.e. only public packages will be included in the index resources.
 
-Due to some packages requiring authentication to be visible different users may have different views of some resources, because of this care needs to be taken when caching the resources. If the registry is served via HTTP the repository must set appropriate cache headers for public and private resources. On hex.pm the resources `/names`, `/versions` and all non-namespaced packages under `/packages/NAME` are public and can be cached. The namespaced resources may be private so the HTTP headers must be checked to know if the responses can be cached [1] [2].
+Due to some packages requiring authentication to be visible different users may have different views of some resources, because of this care needs to be taken when caching the resources. If the registry is served via HTTP the repository must set appropriate cache headers for public and private resources. On hex.pm the resources `/names`, `/versions` and all packages under `/packages/NAME` on the global "hexpm" repository are public and can be cached. Resources on other repositories may be private so the HTTP headers must be checked to know if the responses can be cached [1] [2].
 
 ## Signing
 
