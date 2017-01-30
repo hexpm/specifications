@@ -182,7 +182,7 @@ A user can be recreated for a given `username` and `email` if it has not been ac
 
 + Parameters
     + username_or_email: ericmj (string)
-        Can be either a username or the email address associated with a User
+        Can be either a username or the primary email address associated with a User
 
 + Attributes
     + `username` (string, required) - Only allows any alphanumeric (`[A-Za-z0-9]`) and the following characters: `_-.`. Case insensitive.
@@ -216,7 +216,7 @@ A user can be recreated for a given `username` and `email` if it has not been ac
               "url": "https://hex.pm/api/users/ericmj"
             }
 
-## User reset [/user/{username_or_email}/reset]
+## Password reset [/user/{username_or_email}/reset]
 
 + Parameters
     + username_or_email: ericmj (string)
@@ -224,7 +224,7 @@ A user can be recreated for a given `username` and `email` if it has not been ac
 
 ### Reset User password [POST]
 
-Will start the process to reset a User's password. A confirmation email will be sent to the email address associated with the account. The email will contain a link to follow and will lead to a form where a new password can be provided.
+Will start the process to reset a User's password. An email will be send to the User's primary email address containin a link to follow and will lead to a form where a new password can be chosen.
 
 + Request (application/json)
 
@@ -484,6 +484,8 @@ Will also create a new package or update an existing one. See the package tarbal
 
 + Request
 
+    This request requires authentication.
+
     Marks a release as retired.
 
     + Attributes
@@ -511,6 +513,25 @@ Will also create a new package or update an existing one. See the package tarbal
 + Response 204
 
 ### Unmark Release as Retired [DELETE]
+
++ Request
+
+    This request requires authentication.
+
+    Unmarks a release as retired.
+
+    + Attributes
+        + `reason` (enum[string], required) - Reason for retiring the release
+            + Members
+                + `other`
+                + `invalid`
+                + `security`
+                + `deprecated`
+                + `renamed`
+        + `message` (string, optional) - An additional, clarifying message for the retirement
+
+    + Header
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204
 
@@ -570,14 +591,23 @@ Package owners are Users that can publish packages. Any owner can add or remove 
 
 + Request
 
-    This request requires authentication.
-
     + Header
 
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
-+ Response 204
++ Response 200 (application/json)
+
+    + Attributes (User)
+
+    + Body
+            [{
+              "username": "ericmj",
+              "email": "ericmj@mail.com"
+              "inserted_at": "2015-04-05T01:21:49Z",
+              "updated_at": "2015-04-05T01:21:49Z",
+              "url": "https://hex.pm/api/users/ericmj"
+            }]
 
 ## Package Owner [/packages/{name}/owners/{email}]
 
@@ -589,9 +619,23 @@ Package owners are Users that can publish packages. Any owner can add or remove 
 
 ### Add a Package Owner [PUT]
 
++ Request
+
+    This request requires authentication.
+
+    + Header
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
 + Response 204
 
 ### Remove a Package Owner [DELETE]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204
 
