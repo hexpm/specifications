@@ -11,10 +11,10 @@ The HTTP API is only one of the specifications that makes the package manager He
 Below is a list of related specifications:
 
   * [Endpoints](https://github.com/hexpm/specifications/blob/master/endpoints.md)
+  * [ETS registry format](https://github.com/hexpm/specifications/blob/master/registry-v1.md) (Going to be deprecated)
+  * [New registry format](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
   * [Tarball format](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
-  * [Registry format](https://github.com/hexpm/specifications/blob/master/registry.md)
   * [Package metadata](https://github.com/hexpm/specifications/blob/master/package_metadata.md)
-  * [Semantic Versioning](http://semver.org/)
 
 ### Media types
 
@@ -80,42 +80,42 @@ Basic authentication is only allowed on some resources, specifically ones used t
 
   1. Sending invalid JSON or Erlang will result in `400 Bad Request`.
 
-        HTTP/1.1 400 Bad Request
+         HTTP/1.1 400 Bad Request
 
-        {
-          "status": 400,
-          "message": "bad request"
-        }
+         {
+           "status": 400,
+           "message": "bad request"
+         }
 
   2. Failed authentication attempts will result in `401 Unauthorized`.
 
-        HTTP/1.1 401 Unauthorized
+         HTTP/1.1 401 Unauthorized
 
-        {
-          "status": 401,
-          "message": "failed to authorize"
-        }
+         {
+           "status": 401,
+           "message": "failed to authorize"
+         }
 
   3. Making a request to a missing resource will result in `404 Not Found`.
 
-        HTTP/1.1 404 Not Found
+         HTTP/1.1 404 Not Found
 
-        {
-          "status": 404,
-          "message": "not found"
-        }
+         {
+           "status": 404,
+           "message": "not found"
+         }
 
   4. Validation errors or invalid parameters will return `422 Unprocessable Entity`.
 
-        HTTP/1.1 422 Unprocessable Entity
+         HTTP/1.1 422 Unprocessable Entity
 
-        {
-          "status": 422,
-          "message": "validation failed",
-          "errors": {
-            "email": "has invalid format"
-          }
-        }
+         {
+           "status": 422,
+           "message": "validation failed",
+           "errors": {
+             "email": "has invalid format"
+           }
+         }
 
 ### Package search
 
@@ -149,11 +149,9 @@ A user can be recreated for a given `username` and `email` if it has not been ac
         + `email` (string, required) - Should be a valid email address
 
     + Header
-
             Accept: application/json
 
     + Body
-
             {
               "username": "ericmj",
               "password": "hunter42",
@@ -165,11 +163,9 @@ A user can be recreated for a given `username` and `email` if it has not been ac
     + Attributes (User)
 
     + Header
-
             Location: https://hex.pm/api/users/ericmj
 
     + Body
-
             {
               "username": "ericmj",
               "email": "ericmj@mail.com"
@@ -182,7 +178,7 @@ A user can be recreated for a given `username` and `email` if it has not been ac
 
 + Parameters
     + username_or_email: ericmj (string)
-        Can be either a username or the email address associated with a User
+        Can be either a username or the primary email address associated with a User
 
 + Attributes
     + `username` (string, required) - Only allows any alphanumeric (`[A-Za-z0-9]`) and the following characters: `_-.`. Case insensitive.
@@ -195,19 +191,14 @@ A user can be recreated for a given `username` and `email` if it has not been ac
 
 + Request (application/json)
 
-    This request requires authentication.
-
     + Header
-
             Accept: application/json
-            Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 200 (application/json)
 
     + Attributes (User)
 
     + Body
-
             {
               "username": "ericmj",
               "email": "ericmj@mail.com"
@@ -216,7 +207,7 @@ A user can be recreated for a given `username` and `email` if it has not been ac
               "url": "https://hex.pm/api/users/ericmj"
             }
 
-## User reset [/user/{username_or_email}/reset]
+## Password reset [/user/{username_or_email}/reset]
 
 + Parameters
     + username_or_email: ericmj (string)
@@ -224,14 +215,13 @@ A user can be recreated for a given `username` and `email` if it has not been ac
 
 ### Reset User password [POST]
 
-Will start the process to reset a User's password. A confirmation email will be sent to the email address associated with the account. The email will contain a link to follow and will lead to a form where a new password can be provided.
+Will start the process to reset a User's password. An email will be send to the User's primary email address containin a link to follow and will lead to a form where a new password can be chosen.
 
 + Request (application/json)
 
     This request requires authentication.
 
     + Header
-
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -262,7 +252,6 @@ This collection is paginated.
 + Request
 
     + Header
-
             Accept: application/json
 
 + Response 200 (application/json)
@@ -270,7 +259,6 @@ This collection is paginated.
     + Attributes (array[Package])
 
     + Body
-
             [{
               "name": "plug",
               "url": "https://hex.pm/api/packages/plug",
@@ -299,6 +287,8 @@ This collection is paginated.
 
 + Attributes
     + `name` (string, required) - Package name
+    + `repository` (string, optional) - Name of repository the package belongs to, if unset the package belongs to the global repository
+    + `private` (boolean, optional) - The package is private and needs authentication to be visible and fetched
     + `meta` (object, required) - Package metadata
         + `maintainers` (array[string], required) - Package maintainers
         + `links` (object, required) - Links related to the package, key is the link name, value is the URL
@@ -323,7 +313,6 @@ This collection is paginated.
 + Request
 
     + Header
-
             Accept: application/json
 
 + Response 200 (application/json)
@@ -331,7 +320,6 @@ This collection is paginated.
     + Attributes (Package)
 
     + Body
-
             {
               "name": "plug",
               "url": "https://hex.pm/api/packages/plug",
@@ -380,6 +368,15 @@ After a release has been published there is a one hour window where it can be mo
             + `requirement` (string, required) - [Version requirement](http://elixir-lang.org/docs/stable/elixir/Version.html) on dependency
             + `optional` (boolean, required) - An optional dependency only has to be satisfied if a package higher up the chain also requires it
             + `app` (string, required) - OTP application name, usually the dependency name but can differ
+    + `retired` (object, optional) - Retirement status, if not set the release is not retired
+        + `reason` (enum[string], required) - Reason for retirement
+            + Members
+                + `other`
+                + `invalid`
+                + `security`
+                + `deprecated`
+                + `renamed`
+        + `message` (string, optional) - An additional, clarifying message for the retirement
     + `downloads` (number, required) - Number of downloads of the release
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
@@ -396,7 +393,6 @@ Will also create a new package or update an existing one. See the package tarbal
     The body should be a package tarball following the specification linked in the introduction.
 
     + Header
-
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -405,7 +401,6 @@ Will also create a new package or update an existing one. See the package tarbal
     + Attributes (Release)
 
     + Body
-
             {
               "version": "0.4.1",
               "has_docs": false,
@@ -431,7 +426,6 @@ Will also create a new package or update an existing one. See the package tarbal
 + Request
 
     + Header
-
             Accept: application/json
 
 + Response 200 (application/json)
@@ -439,7 +433,6 @@ Will also create a new package or update an existing one. See the package tarbal
     + Attributes (Release)
 
     + Body
-
             {
               "package_name": "plug",
               "version": "0.4.1",
@@ -460,6 +453,66 @@ Will also create a new package or update an existing one. See the package tarbal
               "inserted_at": "2014-04-23T18:58:54Z",
               "updated_at": "2015-04-26T15:26:23Z"
             }
+
+## Retiring Releases [/packages/{name}/releases/{version}/retire]
+
++ Parameters
+    + name: plug (string)
+        Package name
+    + version: 0.4.1 (string)
+        Release version, should be a [Semantic Version](http://semver.org/)
+
+### Mark Release as Retired [POST]
+
++ Request
+
+    This request requires authentication.
+
+    Marks a release as retired.
+
+    + Attributes
+        + `reason` (enum[string], required) - Reason for retiring the release
+            + Members
+                + `other`
+                + `invalid`
+                + `security`
+                + `deprecated`
+                + `renamed`
+        + `message` (string, optional) - An additional, clarifying message for the retirement
+
+    + Header
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
+    + Body
+            {
+              "reason": "deprecated",
+              "message": "This package has been deprecated in favor of ecto."
+            }
+
++ Response 204
+
+### Unmark Release as Retired [DELETE]
+
++ Request
+
+    This request requires authentication.
+
+    Unmarks a release as retired.
+
+    + Attributes
+        + `reason` (enum[string], required) - Reason for retiring the release
+            + Members
+                + `other`
+                + `invalid`
+                + `security`
+                + `deprecated`
+                + `renamed`
+        + `message` (string, optional) - An additional, clarifying message for the retirement
+
+    + Header
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 204
 
 ## Group Package Documentation
 
@@ -490,13 +543,11 @@ The tarball contents will be served at http://hexdocs.pm/{package}/{version}. Th
     The body should be a gzipped tarball containing files that should be served as documentation for the project. It should contain an `index.html` that will be served as the root.
 
     + Header
-
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 201
 
     + Header
-
             Location: https://hex.pm/api/packages/plug/releases/0.4.1/docs
 
 ### Remove Package Documentation [DELETE]
@@ -517,14 +568,22 @@ Package owners are Users that can publish packages. Any owner can add or remove 
 
 + Request
 
-    This request requires authentication.
-
     + Header
-
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
-+ Response 204
++ Response 200 (application/json)
+
+    + Attributes (User)
+
+    + Body
+            [{
+              "username": "ericmj",
+              "email": "ericmj@mail.com"
+              "inserted_at": "2015-04-05T01:21:49Z",
+              "updated_at": "2015-04-05T01:21:49Z",
+              "url": "https://hex.pm/api/users/ericmj"
+            }]
 
 ## Package Owner [/packages/{name}/owners/{email}]
 
@@ -536,9 +595,23 @@ Package owners are Users that can publish packages. Any owner can add or remove 
 
 ### Add a Package Owner [PUT]
 
++ Request
+
+    This request requires authentication.
+
+    + Header
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
 + Response 204
 
 ### Remove a Package Owner [DELETE]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204
 
@@ -555,7 +628,6 @@ API Keys are used to authenticate requests (see Authentication section for more 
     This request requires authentication.
 
     + Header
-
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -564,7 +636,6 @@ API Keys are used to authenticate requests (see Authentication section for more 
     + Attributes (array[API Key])
 
     + Body
-
             [{
               "name": "my_computer",
               "inserted_at": "2014-04-21T17:20:12Z",
@@ -582,19 +653,17 @@ API Keys are used to authenticate requests (see Authentication section for more 
         + `name` (string, required)
 
     + Header
-
             Accept: application/json
             Authorization: Basic ZXJpY21qOmh1bnRlcjQy
 
     + Body
-
             {"name": "my_computer"}
 
 + Response 201 (application/json)
 
     The `secret` will be sent only once. It should be stored after creating the API key. Subsequent responses to GET requests will not include the `secret`.
 
-    + Attributes (array[API Key])
+    + Attributes (API Key)
         + `secret` - The key secret, a 32 character hex encoded string
 
     + Header
@@ -630,7 +699,6 @@ API Keys are used to authenticate requests (see Authentication section for more 
     This request requires authentication.
 
     + Header
-
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -639,7 +707,6 @@ API Keys are used to authenticate requests (see Authentication section for more 
     + Attributes (API Key)
 
     + Body
-
             {
               "name": "my_computer",
               "inserted_at": "2014-04-21T17:20:12Z",
@@ -654,7 +721,6 @@ API Keys are used to authenticate requests (see Authentication section for more 
     This request requires authentication.
 
     + Header
-
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204

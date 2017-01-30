@@ -10,4 +10,6 @@ Hex does not allow publishing packages with overriding dependencies, an overridi
 
 A package can define *optional* dependencies, an optional dependency should only resolve if the top-level project also depends on it.
 
+A retired release should not resolve any differently than a normal release, regardless if the release is locked or not in the client.
+
 [version requirements]: http://elixir-lang.org/docs/stable/elixir/Version.html
