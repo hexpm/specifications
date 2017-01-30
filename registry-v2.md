@@ -26,6 +26,8 @@ If you are on an Erlang system it is recommended to use the already generated fi
 For the `/names` resource.
 
 ```protobuf
+syntax = "proto2";
+
 message Names {
   // All packages in the repository
   repeated Package packages = 1;
@@ -44,6 +46,8 @@ message Package {
 For the `/versions` resource.
 
 ```protobuf
+syntax = "proto2";
+
 message Versions {
   // All packages in the repository
   repeated Package packages = 1;
@@ -66,6 +70,8 @@ message Package {
 For the `/packages/NAME` resources.
 
 ```protobuf
+syntax = "proto2";
+
 message Package {
   // All releases of the package
   repeated Release releases = 1;
@@ -116,6 +122,8 @@ message Dependency {
 For signing, see below.
 
 ```protobuf
+syntax = "proto2";
+
 message Signed {
   // Signed contents
   required bytes payload = 1;
