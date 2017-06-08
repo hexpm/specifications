@@ -34,7 +34,7 @@ The erlang media type is a safe subset of erlang terms serialized with [`erlang:
 
 ### Rate limiting
 
-The rate limiting allows you to make 100 requests per minute per IP. The limits are likely to change in the future and authenticated requests will be able to make more requests. Additionally, in the future, conditional requests that return `304 Not Modified` will not count against the limits.
+The rate limiting allows you to make 100 requests per minute per IP, or 500 requests per minute for authenticated users. The limits are likely to change in the future and conditional requests that return `304 Not Modified` will not count against the limits.
 
 The returned HTTP headers will tell you about your current rate limit status:
 
