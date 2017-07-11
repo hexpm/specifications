@@ -27,7 +27,7 @@ All keys are strings.
 
   + `version (string) (required)`
 
-    Release version, required to be a [Semantic Version][]
+    Release version, required to be in the [Semantic Version][] format
 
   + `app (string) (required)`
 
