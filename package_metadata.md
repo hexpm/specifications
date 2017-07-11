@@ -21,14 +21,6 @@ All keys are strings.
 
     Package name
 
-  + `repository (string, optional)`
-
-    Package repository
-
-  + `private (boolean, optional)`
-
-    Indicates if the package is private, if the field is not set it is treated as `false`
-
   + `elixir (string) (optional)`
 
     [Version requirement][] on Elixir
@@ -77,6 +69,10 @@ All keys are strings.
     + `requirement (string)`
 
       [Version requirement][] on the dependent
+
+    + `repository (string, optional)`
+
+      Dependency repository
 
   + `build_tools (list(string)) (required)`
 
