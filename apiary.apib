@@ -262,6 +262,7 @@ This collection is paginated.
             [{
               "name": "plug",
               "url": "https://hex.pm/api/packages/plug",
+              "html_url": "https://hex.pm/packages/plug",
               "meta": {
                 "links": {"GitHub": "https://github.com/elixir-lang/plug"},
                 "licenses": ["Apache 2"],
@@ -275,6 +276,7 @@ This collection is paginated.
               "releases": [{
                 "version": "0.4.1",
                 "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
+                "html_url": "https://hex.pm/packages/plug/0.4.1",
               }],
               "inserted_at": "2015-03-24T20:31:35Z",
               "updated_at": "2015-04-02T04:55:41Z"
@@ -304,9 +306,11 @@ This collection is paginated.
             + `inserted_at` (string, required)
             + `updated_at` (string, required)
             + `url` (string, required)
+            + `html_url` (string, required)
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
+    + `html_url` (string, required)
 
 ### Fetch a Package [GET]
 
@@ -323,6 +327,7 @@ This collection is paginated.
             {
               "name": "plug",
               "url": "https://hex.pm/api/packages/plug",
+              "html_url": "https://hex.pm/packages/plug",
               "meta": {
                 "links": {"GitHub": "https://github.com/elixir-lang/plug"},
                 "licenses": ["Apache 2"],
@@ -336,6 +341,7 @@ This collection is paginated.
               "releases": [{
                 "version": "0.4.1",
                 "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
+                "html_url": "https://hex.pm/packages/plug/1.4.2",
                 "inserted_at": "2014-04-23T18:58:54Z",
                 "updated_at": "2015-04-26T15:26:23Z"
               }],
@@ -382,6 +388,7 @@ After a release has been published there is a one hour window where it can be mo
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `docs_url` (string, optional) - URL to docs tarball
     + `url` (string, required)
+    + `html_url` (string, required)
 
 ### Publish a Release [POST]
 
@@ -407,6 +414,7 @@ Will also create a new package or update an existing one. See the package tarbal
               "has_docs": false,
               "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
               "package_url": "https://hex.pm/api/packages/plug",
+              "html_url": "https://hex.pm/packages/plug/0.4.1",
               "meta": {
                 "build_tools": ["mix"]
               },
@@ -440,6 +448,7 @@ Will also create a new package or update an existing one. See the package tarbal
               "has_docs": true,
               "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
               "package_url": "https://hex.pm/api/packages/plug",
+              "html_url": "https://hex.pm/packages/plug/0.4.1",
               "meta": {
                 "build_tools": ["mix"]
               },
