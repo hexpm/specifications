@@ -301,11 +301,8 @@ This collection is paginated.
         + `day` (number, required) - Yesterday
     + `releases` (array, required)
         + `release` (object, required) - See Release for details
-            + `name` (string, required)
-            + `inserted_at` (string, required)
-            + `updated_at` (string, required)
+            + `version` (string, required)
             + `url` (string, required)
-            + `html_url` (string, required)
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
@@ -340,8 +337,6 @@ This collection is paginated.
               "releases": [{
                 "version": "0.4.1",
                 "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
-                "inserted_at": "2014-04-23T18:58:54Z",
-                "updated_at": "2015-04-26T15:26:23Z"
               }],
               "inserted_at": "2015-03-24T20:31:35Z",
               "updated_at": "2015-04-02T04:55:41Z"
