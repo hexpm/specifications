@@ -306,7 +306,7 @@ This collection is paginated.
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
-    + `html_url` (string, required)
+    + `html_url` (string, optional)
 
 ### Fetch a Package [GET]
 
@@ -381,7 +381,7 @@ After a release has been published there is a one hour window where it can be mo
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `docs_url` (string, optional) - URL to docs tarball
     + `url` (string, required)
-    + `html_url` (string, required)
+    + `html_url` (string, optional)
     + `package_url` (string, required)
 
 ### Publish a Release [POST]
