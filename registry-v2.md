@@ -13,12 +13,14 @@ The resources are serialized with [Protocol Buffers](https://developers.google.c
 If you are on an Erlang system it is recommended to use the already generated files in [registry](https://github.com/hexpm/specifications/blob/master/registry). The files were generated with `gpb` 3.23.0 with the options below:
 
 ```elixir
-[verify: :always,
- strings_as_binaries: true,
- maps: true,
- maps_unset_optional: :omitted,
- report_warnings: true,
- target_erlang_version: 18]
+[
+  verify: :always,
+  strings_as_binaries: true,
+  maps: true,
+  maps_unset_optional: :omitted,
+  report_warnings: true,
+  target_erlang_version: 18
+]
 ```
 
 ### names.proto
@@ -84,8 +86,7 @@ message Release {
   required bytes checksum = 2;
   // All dependencies of the release
   repeated Dependency dependencies = 3;
-  // If set the release is retired, a retired release should only be
-  // resolved if it has already been locked in a project
+  // If set the release is retired
   optional RetirementStatus retired = 4;
 }
 
