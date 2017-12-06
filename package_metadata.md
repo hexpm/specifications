@@ -55,22 +55,21 @@ All keys are strings.
 
   + `requirements (kvlist(string => kvlist(...))) (required)`
 
-    All dependencies of the package where the key is the dependent name,
-    all keys below are required
+    All dependencies of the package where the key is the dependent name.
 
-    + `app (string)`
+    + `app (string) (required)`
 
       OTP application name, usually the same name as the package
 
-    + `optional (boolean)`
+    + `optional (boolean) (required)`
 
       If the package is required or not
 
-    + `requirement (string)`
+    + `requirement (string) (required)`
 
       [Version requirement][] on the dependent
 
-    + `repository (string, optional)`
+    + `repository (string) (optional)`
 
       Dependency repository
 
