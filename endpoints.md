@@ -40,10 +40,10 @@ Hex.pm uses the following root endpoints:
 
 Hex.pm supports sub-repositories, they can be accessed at the following endpoints, where `REPO` is the repository name:
 
-  * `/@REPO/names`
-  * `/@REPO/versions`
-  * `/@REPO/packages/PACKAGE`
-  * `/@REPO/tarballs/PACKAGE-VERSION.tar`
+  * `/repos/REPO/names`
+  * `/repos/REPO/versions`
+  * `/repos/REPO/packages/PACKAGE`
+  * `/repos/REPO/tarballs/PACKAGE-VERSION.tar`
 
 ### Private key
 
