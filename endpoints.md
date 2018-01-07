@@ -36,14 +36,14 @@ Hex.pm uses the following root endpoints:
   * HTTP API - https://hex.pm/api
   * Repository - https://repo.hex.pm
 
-### Sub-repositories
+### Private repositories
 
-Hex.pm supports sub-repositories, they can be accessed at the following endpoints, where `REPO` is the repository name:
+Hex.pm supports private repositories for organizations, they can be accessed at the following endpoints, where `REPO` is the repository name:
 
-  * `/@REPO/names`
-  * `/@REPO/versions`
-  * `/@REPO/packages/PACKAGE`
-  * `/@REPO/tarballs/PACKAGE-VERSION.tar`
+  * `/repos/REPO/names`
+  * `/repos/REPO/versions`
+  * `/repos/REPO/packages/PACKAGE`
+  * `/repos/REPO/tarballs/PACKAGE-VERSION.tar`
 
 ### Private key
 
