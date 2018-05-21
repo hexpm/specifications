@@ -149,9 +149,11 @@ A user can be recreated for a given `username` and `email` if it has not been ac
         + `email` (string, required) - Should be a valid email address
 
     + Header
+
             Accept: application/json
 
     + Body
+
             {
               "username": "ericmj",
               "password": "hunter42",
@@ -163,9 +165,11 @@ A user can be recreated for a given `username` and `email` if it has not been ac
     + Attributes (User)
 
     + Header
+
             Location: https://hex.pm/api/users/ericmj
 
     + Body
+
             {
               "username": "ericmj",
               "email": "ericmj@mail.com"
@@ -192,6 +196,7 @@ A user can be recreated for a given `username` and `email` if it has not been ac
 + Request (application/json)
 
     + Header
+
             Accept: application/json
 
 + Response 200 (application/json)
@@ -199,6 +204,7 @@ A user can be recreated for a given `username` and `email` if it has not been ac
     + Attributes (User)
 
     + Body
+
             {
               "username": "ericmj",
               "email": "ericmj@mail.com"
@@ -222,6 +228,7 @@ Will start the process to reset a User's password. An email will be send to the 
     This request requires authentication.
 
     + Header
+
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -252,6 +259,7 @@ This collection is paginated.
 + Request
 
     + Header
+
             Accept: application/json
 
 + Response 200 (application/json)
@@ -259,6 +267,7 @@ This collection is paginated.
     + Attributes (array[Package])
 
     + Body
+
             [{
               "name": "plug",
               "url": "https://hex.pm/api/packages/plug",
@@ -313,6 +322,7 @@ This collection is paginated.
 + Request
 
     + Header
+
             Accept: application/json
 
 + Response 200 (application/json)
@@ -320,6 +330,7 @@ This collection is paginated.
     + Attributes (Package)
 
     + Body
+
             {
               "name": "plug",
               "url": "https://hex.pm/api/packages/plug",
@@ -395,6 +406,7 @@ Will also create a new package or update an existing one. See the package tarbal
     The body should be a package tarball following the specification linked in the introduction.
 
     + Header
+
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -403,6 +415,7 @@ Will also create a new package or update an existing one. See the package tarbal
     + Attributes (Release)
 
     + Body
+
             {
               "version": "0.4.1",
               "has_docs": false,
@@ -429,6 +442,7 @@ Will also create a new package or update an existing one. See the package tarbal
 + Request
 
     + Header
+
             Accept: application/json
 
 + Response 200 (application/json)
@@ -436,6 +450,7 @@ Will also create a new package or update an existing one. See the package tarbal
     + Attributes (Release)
 
     + Body
+
             {
               "package_name": "plug",
               "version": "0.4.1",
@@ -485,9 +500,11 @@ Will also create a new package or update an existing one. See the package tarbal
         + `message` (string, optional) - An additional, clarifying message for the retirement
 
     + Header
+
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
     + Body
+
             {
               "reason": "deprecated",
               "message": "This package has been deprecated in favor of ecto."
@@ -514,6 +531,7 @@ Will also create a new package or update an existing one. See the package tarbal
         + `message` (string, optional) - An additional, clarifying message for the retirement
 
     + Header
+
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204
@@ -547,11 +565,13 @@ The tarball contents will be served at http://hexdocs.pm/{package}/{version}. Th
     The body should be a gzipped tarball containing files that should be served as documentation for the project. It should contain an `index.html` that will be served as the root.
 
     + Header
+
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 201
 
     + Header
+
             Location: https://hex.pm/api/packages/plug/releases/0.4.1/docs
 
 ### Remove Package Documentation [DELETE]
@@ -573,6 +593,7 @@ Package owners are Users that can publish packages. Any owner can add or remove 
 + Request
 
     + Header
+
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -581,6 +602,7 @@ Package owners are Users that can publish packages. Any owner can add or remove 
     + Attributes (User)
 
     + Body
+
             [{
               "username": "ericmj",
               "email": "ericmj@mail.com"
@@ -604,6 +626,7 @@ Package owners are Users that can publish packages. Any owner can add or remove 
     This request requires authentication.
 
     + Header
+
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204
@@ -615,6 +638,7 @@ Package owners are Users that can publish packages. Any owner can add or remove 
     This request requires authentication.
 
     + Header
+
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204
@@ -632,6 +656,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
     This request requires authentication.
 
     + Header
+
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -640,6 +665,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
     + Attributes (array[API Key])
 
     + Body
+
             [{
               "name": "my_computer",
               "inserted_at": "2014-04-21T17:20:12Z",
@@ -657,10 +683,12 @@ API Keys are used to authenticate requests (see Authentication section for more 
         + `name` (string, required)
 
     + Header
+
             Accept: application/json
             Authorization: Basic ZXJpY21qOmh1bnRlcjQy
 
     + Body
+
             {"name": "my_computer"}
 
 + Response 201 (application/json)
@@ -703,6 +731,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
     This request requires authentication.
 
     + Header
+
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
@@ -711,6 +740,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
     + Attributes (API Key)
 
     + Body
+
             {
               "name": "my_computer",
               "inserted_at": "2014-04-21T17:20:12Z",
@@ -725,6 +755,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
     This request requires authentication.
 
     + Header
+
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204
