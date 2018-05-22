@@ -271,7 +271,72 @@ Will start the process to reset a User's password. An email will be send to the 
 
 + Response 204 (application/json)
 
-# Group Releases
+# Group Repositories
+
+## Repositories Collection [/repos]
+
+Returns all public repositories and, if authenticated, all repositories the user is member of.
+
+### List all Repositories [GET]
+
++ Request
+
+    + Header
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    + Attributes (array[Repository])
+
+    + Body
+
+            [{
+              "name": "acme",
+              "public": false,
+              "active": true,
+              "billing_active": true,
+              "inserted_at": "2015-03-24T20:31:35Z",
+              "updated_at": "2015-04-02T04:55:41Z"
+            }]
+
+## Repository [/repos/{name}]
+
++ Parameters
+    + name: plug (string) - Package name
+
++ Attributes
+    + `name` (string, required) - Repository name
+    + `public` (boolean, required) - If repository is public
+    + `active` (boolean, required) - If repository is active
+    + `billing_active` (boolean, required) - If billing is actuve for repository
+    + `inserted_at` (string, required) - ISO8601-encoded timestamp
+    + `updated_at` (string, required) - ISO8601-encoded timestamp
+
+### Fetch a Repository [GET]
+
++ Request
+
+    + Header
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    + Attributes (Repository)
+
+    + Body
+
+            {
+              "name": "acme",
+              "public": false,
+              "active": true,
+              "billing_active": true,
+              "inserted_at": "2015-03-24T20:31:35Z",
+              "updated_at": "2015-04-02T04:55:41Z"
+            }
+
+# Group Packages
 
 Packages are essentially a (unique) name with some associated metadata. Group releases are a way to group and structure package releases which will be covered later.
 
