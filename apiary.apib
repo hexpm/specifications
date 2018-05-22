@@ -688,7 +688,7 @@ The tarball contents will be served at http://hexdocs.pm/{package}/{version}. Th
 
 # Group Package Owners
 
-Package owners are Users that can publish packages. Any owner can add or remove other package owners so be careful with whom you add.
+Package owners are Users that can publish, revert, and retire packages. There are two ownership levels, `full` and `maintainer`, the difference is that only full owners can add and remove other owners.
 
 ## Package Owners Collection [/packages/{name}/owners]
 
@@ -705,15 +705,20 @@ Package owners are Users that can publish packages. Any owner can add or remove 
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
+    + Attributes (User)
+        + `level` (string, required) - Ownership level.
+
 + Response 200 (application/json)
 
     + Attributes (User)
+        + `level` (string, required) - Ownership level.
 
     + Body
 
             [{
               "username": "ericmj",
-              "email": "ericmj@mail.com"
+              "email": "ericmj@mail.com",
+              "level": "full",
               "inserted_at": "2015-04-05T01:21:49Z",
               "updated_at": "2015-04-05T01:21:49Z",
               "url": "https://hex.pm/api/users/ericmj"
@@ -727,6 +732,14 @@ Package owners are Users that can publish packages. Any owner can add or remove 
     + email: ericmj@mail.com (string)
         User account email, should be a valid email address belonging to an existing user
 
++ Attributes
+    + level: maintainer (enum[string], optional)
+        Ownership level
+        + Default: full
+        + Members
+            + full - Full owner
+            + maintainer - Maintainer owner
+
 ### Add a Package Owner [PUT]
 
 + Request
@@ -737,7 +750,24 @@ Package owners are Users that can publish packages. Any owner can add or remove 
 
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
-+ Response 204
+    + Attributes (User)
+        + `level` (string, required) - Ownership level.
+
++ Response 200 (application/json)
+
+    + Attributes (User)
+        + `level` (string, required) - Ownership level.
+
+    + Body
+
+            [{
+              "username": "ericmj",
+              "email": "ericmj@mail.com",
+              "level": "full",
+              "inserted_at": "2015-04-05T01:21:49Z",
+              "updated_at": "2015-04-05T01:21:49Z",
+              "url": "https://hex.pm/api/users/ericmj"
+            }]
 
 ### Remove a Package Owner [DELETE]
 
