@@ -178,7 +178,7 @@ A user can be recreated for a given `username` and `email` if it has not been ac
               "url": "https://hex.pm/api/users/ericmj"
             }
 
-## User [/user/{username_or_email}]
+## User [/users/{username_or_email}]
 
 + Parameters
     + username_or_email: ericmj (string)
@@ -213,7 +213,44 @@ A user can be recreated for a given `username` and `email` if it has not been ac
               "url": "https://hex.pm/api/users/ericmj"
             }
 
-## Password reset [/user/{username_or_email}/reset]
+
+
+## Currently authenticated user [/users/me]
+
+### Fetch currently authenticated user [GET]
+
++ Request (application/json)
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (User)
+        + `organizations` (array, required) - Organizations user is member of.
+            + `organization` (object)
+                + `name` (string, required) - Organization name.
+                + `role` (string, required) - Role in organization.
+
+    + Body
+
+            {
+              "username": "ericmj",
+              "email": "ericmj@mail.com",
+              "organizations": [
+                {
+                  "name": "acme",
+                  "role": "admin"
+                }
+              ],
+              "inserted_at": "2015-04-05T01:21:49Z",
+              "updated_at": "2015-04-05T01:21:49Z",
+              "url": "https://hex.pm/api/users/ericmj"
+            }
+
+## Password reset [/users/{username_or_email}/reset]
 
 + Parameters
     + username_or_email: ericmj (string)
