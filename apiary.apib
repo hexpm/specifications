@@ -374,6 +374,7 @@ This collection is paginated.
               "name": "plug",
               "url": "https://hex.pm/api/packages/plug",
               "html_url": "https://hex.pm/packages/plug",
+              "docs_html_url": "https://hexdocs.pm/plug",
               "meta": {
                 "links": {"GitHub": "https://github.com/elixir-lang/plug"},
                 "licenses": ["Apache 2"],
@@ -418,6 +419,7 @@ This collection is paginated.
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
     + `html_url` (string, optional)
+    + `docs_html_url` (string, optional)
 
 ### Fetch a Package [GET]
 
@@ -437,6 +439,7 @@ This collection is paginated.
               "name": "plug",
               "url": "https://hex.pm/api/packages/plug",
               "html_url": "https://hex.pm/packages/plug",
+              "docs_html_url": "https://hexdocs.pm/plug",
               "meta": {
                 "links": {"GitHub": "https://github.com/elixir-lang/plug"},
                 "licenses": ["Apache 2"],
@@ -495,6 +498,7 @@ After a release has been published there is a one hour window where it can be mo
     + `docs_url` (string, optional) - URL to docs tarball
     + `url` (string, required)
     + `html_url` (string, optional)
+    + `docs_html_url` (string, optional)
     + `package_url` (string, required)
 
 ### Publish a Release [POST]
@@ -524,6 +528,7 @@ Will also create a new package or update an existing one. See the package tarbal
               "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
               "package_url": "https://hex.pm/api/packages/plug",
               "html_url": "https://hex.pm/packages/plug/0.4.1",
+              "docs_html_url": "https://hexdocs.pm/plug/0.4.1",
               "meta": {
                 "build_tools": ["mix"]
               },
@@ -560,6 +565,7 @@ Will also create a new package or update an existing one. See the package tarbal
               "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
               "package_url": "https://hex.pm/api/packages/plug",
               "html_url": "https://hex.pm/packages/plug/0.4.1",
+              "docs_html_url": "https://hexdocs.pm/plug/0.4.1",
               "meta": {
                 "build_tools": ["mix"]
               },
