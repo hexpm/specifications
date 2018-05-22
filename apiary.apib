@@ -806,6 +806,12 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
             [{
               "name": "my_computer",
+              "permissions": [
+                {
+                  "domain": "api",
+                  "resource": "read"
+                }
+              ],
               "inserted_at": "2014-04-21T17:20:12Z",
               "updated_at": "2014-04-21T17:20:12Z",
               "url": "https://hex.pm/api/keys/my_computer"
@@ -827,7 +833,15 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
     + Body
 
-            {"name": "my_computer"}
+            {
+              "name": "my_computer",
+              "permissions": [
+                {
+                  "domain": "api",
+                  "resource": "read"
+                }
+              ]
+            }
 
 + Response 201 (application/json)
 
@@ -844,6 +858,12 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
             {
               "name": "my_computer",
+              "permissions": [
+                {
+                  "domain": "api",
+                  "resource": "read"
+                }
+              ],
               "secret": "e2bfe5e65b9235acebe06df8027905c0",
               "inserted_at": "2014-04-21T17:20:12Z",
               "updated_at": "2014-04-21T17:20:12Z",
@@ -858,6 +878,10 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
 + Attributes
     + `name` (string, required) - Key name
+    + `permissions` (array, required) - Key permissions
+        + `permission` (object)
+            + `domain` (string, required) - The area where the key applies, one of `api`, `repository`, and `repositories`
+            + `resource` (string, optional) - The specific resource the key has access to, for `api` it can be `read` or `write` (default `write`), for `repository` the repository name
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
@@ -881,6 +905,12 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
             {
               "name": "my_computer",
+              "permissions": [
+                {
+                  "domain": "api",
+                  "resource": "read"
+                }
+              ],
               "inserted_at": "2014-04-21T17:20:12Z",
               "updated_at": "2014-04-21T17:20:12Z",
               "url": "https://hex.pm/api/keys/my_computer"
