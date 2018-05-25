@@ -501,6 +501,45 @@ After a release has been published there is a one hour window where it can be mo
     + `docs_html_url` (string, optional)
     + `package_url` (string, required)
 
+### Fetch a Release [GET]
+
++ Request
+
+    + Header
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    + Attributes (Release)
+
+    + Body
+
+            {
+              "package_name": "plug",
+              "version": "0.4.1",
+              "has_docs": true,
+              "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
+              "package_url": "https://hex.pm/api/packages/plug",
+              "html_url": "https://hex.pm/packages/plug/0.4.1",
+              "docs_html_url": "https://hexdocs.pm/plug/0.4.1",
+              "meta": {
+                "build_tools": ["mix"]
+              },
+              "dependencies": {
+                "cowboy": {
+                  "requirement": "~> 1.0",
+                  "optional": true,
+                  "app": "cowboy"
+                }
+              }
+              "downloads": 16,
+              "inserted_at": "2014-04-23T18:58:54Z",
+              "updated_at": "2015-04-26T15:26:23Z"
+            }
+
+## Publishing Releases [/publish]
+
 ### Publish a Release [POST]
 
 Will also create a new package or update an existing one. See the package tarball specification for details about the request contents.
@@ -542,43 +581,6 @@ Will also create a new package or update an existing one. See the package tarbal
               "downloads": 16,
               "inserted_at": "2014-04-23T18:58:54Z",
               "updated_at": "2014-04-23T18:58:54Z"
-            }
-
-### Fetch a Release [GET]
-
-+ Request
-
-    + Header
-
-            Accept: application/json
-
-+ Response 200 (application/json)
-
-    + Attributes (Release)
-
-    + Body
-
-            {
-              "package_name": "plug",
-              "version": "0.4.1",
-              "has_docs": true,
-              "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
-              "package_url": "https://hex.pm/api/packages/plug",
-              "html_url": "https://hex.pm/packages/plug/0.4.1",
-              "docs_html_url": "https://hexdocs.pm/plug/0.4.1",
-              "meta": {
-                "build_tools": ["mix"]
-              },
-              "dependencies": {
-                "cowboy": {
-                  "requirement": "~> 1.0",
-                  "optional": true,
-                  "app": "cowboy"
-                }
-              }
-              "downloads": 16,
-              "inserted_at": "2014-04-23T18:58:54Z",
-              "updated_at": "2015-04-26T15:26:23Z"
             }
 
 ## Retiring Releases [/packages/{name}/releases/{version}/retire]
