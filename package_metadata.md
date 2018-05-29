@@ -47,6 +47,8 @@ All keys are strings.
 
   + `maintainers (list(string)) (optional)`
 
+    This field is deprecated!
+
     The package's maintainers, can be a list of names and/or emails
 
   + `links (kvlist(string => string)) (optional)`
