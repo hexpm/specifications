@@ -794,6 +794,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
             [{
               "name": "my_computer",
+              "authing_key": true,
               "permissions": [
                 {
                   "domain": "api",
@@ -826,7 +827,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
               "permissions": [
                 {
                   "domain": "api",
-                  "resource": "read"
+                  "resource": "write"
                 }
               ]
             }
@@ -853,6 +854,13 @@ API Keys are used to authenticate requests (see Authentication section for more 
                 }
               ],
               "secret": "e2bfe5e65b9235acebe06df8027905c0",
+              "authing_key": false,
+              "permissions": [
+                {
+                  "domain": "api",
+                  "resource": "write"
+                }
+              ],
               "inserted_at": "2014-04-21T17:20:12Z",
               "updated_at": "2014-04-21T17:20:12Z",
               "url": "https://hex.pm/api/keys/my_computer"
@@ -866,10 +874,16 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
 + Attributes
     + `name` (string, required) - Key name
-    + `permissions` (array, required) - Key permissions
-        + `permission` (object)
-            + `domain` (string, required) - The area where the key applies, one of `api`, `repository`, and `repositories`
-            + `resource` (string, optional) - The specific resource the key has access to, for `api` it can be `read` or `write` (default `write`), for `repository` the repository name
+    + `secret` (string, optional) - Only available immediately after creation, the user secret for the key
+    + `permissions` (array, required) - List of permissions the key has
+      + `permission` (object)
+        + `domain` (enum[string], required) - The domain of the permission
+            + Members
+                + `api` - Gives permission to actions on the API (can be specified with `resource` values `write` and `read`, default is `write`)
+                + `repository` - Gives permission to actions on a specific repository specified in the `resource`
+                + `repositories` -  Gives permission to actions on all repositories the user has access to, the `resource` is omitted
+        + `resource` (string, optional)
+    + `revoked_at` (string, optional) - If revoked, the ISO8601-encoded timestamp when it was revoked
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
@@ -893,10 +907,11 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
             {
               "name": "my_computer",
+              "authing_key": true,
               "permissions": [
                 {
                   "domain": "api",
-                  "resource": "read"
+                  "resource": "write"
                 }
               ],
               "inserted_at": "2014-04-21T17:20:12Z",
