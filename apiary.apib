@@ -342,6 +342,8 @@ Packages are essentially a (unique) name with some associated metadata. Group re
 
 ## Packages Collection [/packages{?sort,search}]
 
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
 This collection is paginated.
 
 ### List all Packages [GET]
@@ -466,6 +468,8 @@ After a release has been published there is a one hour window where it can be mo
 
 ## Release [/packages/{name}/releases/{version}]
 
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
 + Parameters
     + name: plug (string)
         Package name
@@ -585,6 +589,8 @@ Will also create a new package or update an existing one. See the package tarbal
 
 ## Retiring Releases [/packages/{name}/releases/{version}/retire]
 
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
 + Parameters
     + name: plug (string)
         Package name
@@ -654,6 +660,8 @@ Package Documentation is optional to implement.
 
 ## Package Documentation [/packages/{name}/releases/{version}/docs]
 
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
 + Parameters
     + name: plug (string)
         Package name
@@ -694,6 +702,8 @@ Package owners are Users that can publish, revert, and retire packages. There ar
 
 ## Package Owners Collection [/packages/{name}/owners]
 
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
 + Parameters
     + name: plug (string)
         Package name
@@ -708,12 +718,12 @@ Package owners are Users that can publish, revert, and retire packages. There ar
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
     + Attributes (User)
-        + `level` (string, required) - Ownership level.
+        + `level` (enum[string], required) - Ownership level.
 
 + Response 200 (application/json)
 
     + Attributes (User)
-        + `level` (string, required) - Ownership level.
+        + `level` (enum[string], required) - Ownership level.
 
     + Body
 
@@ -727,6 +737,8 @@ Package owners are Users that can publish, revert, and retire packages. There ar
             }]
 
 ## Package Owner [/packages/{name}/owners/{email}]
+
+Also available under /repos/{repository} for packages belonging to a specific repository.
 
 + Parameters
     + name: plug (string)
@@ -753,7 +765,7 @@ Package owners are Users that can publish, revert, and retire packages. There ar
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
     + Attributes (User)
-        + `level` (string, required) - Ownership level.
+        + `level` (enum[string], required) - Ownership level.
 
 + Response 204 (application/json)
 
