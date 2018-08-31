@@ -141,6 +141,8 @@ A successful user creation will send a confirmation email to the given email add
 
 A user can be recreated for a given `username` and `email` if it has not been activated yet.
 
+API clients are required to include a text with a link to the [Hex Terms of Service](https://hex.pm/policies/termsofservice) that ensures users agree to the terms. If clients do not follow this requirement their access to the API may be limited. If using the API specification to sign up to non-official Hex services, this text is not required, but others services may have similar requirements.
+
 + Request (application/json)
 
     + Attributes
