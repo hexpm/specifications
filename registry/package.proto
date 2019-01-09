@@ -3,6 +3,10 @@ syntax = "proto2";
 message Package {
   // All releases of the package
   repeated Release releases = 1;
+  // Name of package
+  required string name = 2;
+  // Name of repository
+  required string repository = 3;
 }
 
 message Release {
@@ -12,7 +16,8 @@ message Release {
   required bytes checksum = 2;
   // All dependencies of the release
   repeated Dependency dependencies = 3;
-  // If set the release is retired
+  // If set the release is retired, a retired release should only be
+  // resolved if it has already been locked in a project
   optional RetirementStatus retired = 4;
 }
 
