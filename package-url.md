@@ -20,9 +20,15 @@ written in/for Erlang, Elixir or any other BEAM language.
 * The 'type' is "hex"
 * The default repository is https://hex.pm
 * The 'namespace' is optional; it may be used to specify the organization for
-  private packages on hex.pm
-* The 'name' is the package name
+  private packages on hex.pm; it is not case sensitive and must be lowercased.
+* The 'name' is the package name; it is not case sensitive and must be lowercased
 * The 'version' is the package version
+* Optional qualifiers:
+  * 'repository_url' - used to select a non-default repository; it must contain
+     the full base URL for the repository, not the short name that's used
+     locally to select it; run 'mix help hex.repo' for more information on
+     setting repository URLs
+  * 'checksum' - as per purl specification
 
 ## Examples
 
