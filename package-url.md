@@ -18,7 +18,7 @@ written in/for Erlang, Elixir or any other BEAM language.
 ## Definition
 
 * The 'type' is "hex"
-* The default repository is https://hex.pm
+* The default repository is https://repo.hex.pm
 * The 'namespace' is optional; it may be used to specify the organization for
   private packages on hex.pm; it is not case sensitive and must be lowercased.
 * The 'name' is the package name; it is not case sensitive and must be lowercased
