@@ -6,6 +6,7 @@
   * [New registry format](https://github.com/hexpm/specifications/blob/master/registry-v2.md)
   * [Tarball format](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
   * [Package metadata](https://github.com/hexpm/specifications/blob/master/package_metadata.md)
+  * [purl (Package URL) format](https://github.com/hexpm/specifications/blob/master/package-url.md)
 
 ## Repositories and mirrors
 
