@@ -16,6 +16,7 @@ See [apiary.apib](https://github.com/hexpm/specifications/blob/master/apiary.api
   * `/tarballs/PACKAGE-VERSION.tar` - [Package tarball](https://github.com/hexpm/specifications/blob/master/package_tarball.md)
   * `/registry.ets.gz` - [Registry v1](https://github.com/hexpm/specifications/blob/master/registry-v1.md) (DEPRECATED!)
   * `/registry.ets.gz.signed` - (optional) (DEPRECATED!)
+  * `/public_key` - (optional) RSA public key of the repository, see "Registry v1 signing" and "Registry v2 signing" sections below
 
 ### Registry authentication
 
