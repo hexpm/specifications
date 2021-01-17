@@ -20,7 +20,7 @@ See [apiary.apib](https://github.com/hexpm/specifications/blob/master/apiary.api
 
 ### Registry authentication
 
-The repository can require authentication for some resources. Token authentication with the `Authorization` header as described in the HTTP API should be used. Care needs to be taken by clients to *only* send the token to the actual repository, when unofficial mirrors are used authentication must be disabled.
+The repository can require authentication for some resources. Token authentication with the `Authorization` header as described in the HTTP API should be used. Care needs to be taken by clients to *only* send the token to the actual repository, when untrusted mirrors are used authentication must be disabled.
 
 ### Registry v1 signing
 
