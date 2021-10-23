@@ -16,7 +16,7 @@ The package tarball contains the following files:
 
   * CHECKSUM
 
-    SHA-256 hex-encoded checksum of the included tarball. The checksum is calculated by taking the contents of all files (except CHECKSUM), concatenating them, running `sha256` over the concatenated data, and finally hex (`base16`) encoding it.
+    SHA-256 hex-encoded checksum of the included tarball. The checksum is calculated by taking the contents of all files (except CHECKSUM), concatenating them, running `sha256` over the concatenated data, and finally uppercase hex (`base16`) encoding it.
 
         contents = read_file("VERSION") + read_file("metadata.config") + read_file("content.tar.gz")
         checksum = sha256(contents)
