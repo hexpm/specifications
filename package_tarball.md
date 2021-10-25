@@ -4,7 +4,7 @@ The package tarball contains the following files:
 
   * VERSION
 
-    The tarball version as a single ASCII integer.
+    The tarball version as a single ASCII integer. The current tarball version is 3.
 
   * metadata.config
 
