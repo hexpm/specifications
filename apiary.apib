@@ -174,7 +174,7 @@ API clients are required to include a text with a link to the [Hex Terms of Serv
 
             {
               "username": "ericmj",
-              "email": "ericmj@mail.com"
+              "email": "ericmj@mail.com",
               "inserted_at": "2015-04-05T01:21:49Z",
               "updated_at": "2015-04-05T01:21:49Z",
               "url": "https://hex.pm/api/users/ericmj"
@@ -209,7 +209,7 @@ API clients are required to include a text with a link to the [Hex Terms of Serv
 
             {
               "username": "ericmj",
-              "email": "ericmj@mail.com"
+              "email": "ericmj@mail.com",
               "inserted_at": "2015-04-05T01:21:49Z",
               "updated_at": "2015-04-05T01:21:49Z",
               "url": "https://hex.pm/api/users/ericmj"
@@ -489,7 +489,7 @@ Also available under /repos/{repository} for packages belonging to a specific re
             + `requirement` (string, required) - [Version requirement](http://elixir-lang.org/docs/stable/elixir/Version.html) on dependency
             + `optional` (boolean, required) - An optional dependency only has to be satisfied if a package higher up the chain also requires it
             + `app` (string, required) - OTP application name, usually the dependency name but can differ
-    + `retired` (object, optional) - Retirement status, if not set the release is not retired
+    + `retirement` (object, optional) - Retirement status, if not set the release is not retired
         + `reason` (enum[string], required) - Reason for retirement
             + Members
                 + `other`
