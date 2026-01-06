@@ -1,5 +1,7 @@
 # Specifications
 
+## Protocol Specifications
+
   * [Endpoints](./endpoints.md)
   * [HTTP API](./http_api.md)
   * [ETS registry format](./registry-v1.md) (Deprecated)
@@ -9,6 +11,10 @@
 ## Related specifications
 
   * [purl (Package URL) format](./package-url.md)
+
+## Security
+
+  * [Security Documentation](./security/README.md) - Threat model, SDLC, operations, supply chain, compliance
 
 ## Repositories and mirrors
 
