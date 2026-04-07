@@ -52,7 +52,9 @@ All API requests must include a valid `User-Agent` header. An invalid or missing
 
 Requests on collection resources return paginated results. Requests that return multiple results may return up to 100 items. You can specify further pages with the `?page` parameter.
 
-    $ curl https://hex.pm/api/packages?page=2
+```
+$ curl https://hex.pm/api/packages?page=2
+```
 
 Page numbering start from 1 and will by default return the first page.
 
@@ -62,19 +64,41 @@ Most responses return an `ETag` header. Many responses will also return a `Last-
 
 ### Authentication
 
-There are two way ways to authenticate requests in the Hex API: Basic Authentication with a username and password, or with an API token. Failed authentication attempts will return `401 Unauthorized`. Resources accessed without proper authentication will return a `403 Forbidden` except for some resources that return `404 Not Found` to prevent leaking sensitive data.
+There are three ways to authenticate requests in the Hex API: OAuth2 tokens obtained via the Device Authorization Grant, API tokens, or Basic Authentication with a username and password. Failed authentication attempts will return `401 Unauthorized`. Resources accessed without proper authentication will return a `403 Forbidden` except for some resources that return `404 Not Found` to prevent leaking sensitive data.
 
 Any endpoint implementation for Hex should support SSL termination by default, to prevent user credentials from being intercepted by third parties.
 
-##### Basic Authentication
+##### OAuth2 Token
 
-    $ curl -u "username" https://hex.pm/api
+```
+$ curl -H "Authorization: token" https://hex.pm/api
+```
 
-Basic authentication is only allowed on some resources, specifically ones used to generate API tokens. This is because the basic authentication is computationally expensive and less secure than using API tokens.
+OAuth2 tokens are obtained via the [Device Authorization Grant (RFC 8628)](https://datatracker.ietf.org/doc/html/rfc8628). See the OAuth section below for details. OAuth tokens have read-only permissions by default; write operations require two-factor authentication via the `x-hex-otp` header.
 
 ##### API Token
 
-    $ curl -H "Authorization: token" https://hex.pm/api
+```
+$ curl -H "Authorization: token" https://hex.pm/api
+```
+
+API tokens can be created via the web interface or the `/keys` endpoint. They provide direct access without the OAuth flow.
+
+##### Basic Authentication (Deprecated)
+
+```
+$ curl -u "username" https://hex.pm/api
+```
+
+Basic authentication is deprecated and only allowed on some resources, specifically ones used to generate API tokens. This is because basic authentication is computationally expensive and less secure than using API tokens. New integrations should use OAuth2 Device Authorization instead.
+
+### Two-Factor Authentication (2FA)
+
+Write operations may require two-factor authentication. When 2FA is required, the server will respond with `403 Forbidden` and a message indicating that a one-time password is needed. The client should then retry the request with the `x-hex-otp` header containing the TOTP code.
+
+```
+$ curl -H "Authorization: token" -H "x-hex-otp: 123456" https://hex.pm/api/publish
+```
 
 ### Client errors
 
@@ -128,6 +152,43 @@ The search fields are:
   * `name` - Package name, can include the wildcard operator `*` at the end or start of the string.
   * `description` - Full text search package description.
   * `extra` - Comma-separated search on `extra` map in metadata. `extra:type,nerves` will match `{"type": "nerves"}`.
+
+# Group API Index
+
+## API Index [/]
+
+### Get API Index [GET]
+
+Returns available API endpoints and documentation URL.
+
++ Request
+
+    + Header
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    + Attributes
+        + `packages_url` (string, required) - URL template for packages collection
+        + `package_url` (string, required) - URL template for a single package
+        + `package_release_url` (string, required) - URL template for a package release
+        + `package_owners_url` (string, required) - URL template for package owners
+        + `keys_url` (string, required) - URL for API keys collection
+        + `key_url` (string, required) - URL template for a single API key
+        + `documentation_url` (string, required) - URL to API documentation
+
+    + Body
+
+            {
+              "packages_url": "https://hex.pm/api/packages",
+              "package_url": "https://hex.pm/api/packages/{name}",
+              "package_release_url": "https://hex.pm/api/packages/{name}/releases/{version}",
+              "package_owners_url": "https://hex.pm/api/packages/{name}/owners",
+              "keys_url": "https://hex.pm/api/keys",
+              "key_url": "https://hex.pm/api/keys/{name}",
+              "documentation_url": "https://docs.hexpm.apiary.io"
+            }
 
 # Group Users
 
@@ -188,10 +249,19 @@ API clients are required to include a text with a link to the [Hex Terms of Serv
 
 + Attributes
     + `username` (string, required) - Only allows any alphanumeric (`[A-Za-z0-9]`) and the following characters: `_-.`. Case insensitive.
-    + `email` (string, required) - Should be a valid email address
+    + `email` (string, optional) - Primary email address, only included if set to public
+    + `full_name` (string, optional) - User's full name
+    + `handles` (object, optional) - Social media handles (keys are service names, values are URLs)
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
+    + `owned_packages` (object, optional) - Deprecated. Map of package names to their API URLs
+    + `packages` (array, optional) - List of owned packages
+        + (object)
+            + `name` (string, required) - Package name
+            + `repository` (string, required) - Repository name
+            + `url` (string, required) - API URL
+            + `html_url` (string, required) - Web URL
 
 ### Fetch a User [GET]
 
@@ -210,9 +280,25 @@ API clients are required to include a text with a link to the [Hex Terms of Serv
             {
               "username": "ericmj",
               "email": "ericmj@mail.com",
+              "full_name": "Eric Meadows-Jönsson",
+              "handles": {
+                "GitHub": "https://github.com/ericmj",
+                "Twitter": "https://twitter.com/emjii"
+              },
               "inserted_at": "2015-04-05T01:21:49Z",
               "updated_at": "2015-04-05T01:21:49Z",
-              "url": "https://hex.pm/api/users/ericmj"
+              "url": "https://hex.pm/api/users/ericmj",
+              "packages": [
+                {
+                  "name": "ecto",
+                  "repository": "hexpm",
+                  "url": "https://hex.pm/api/packages/ecto",
+                  "html_url": "https://hex.pm/packages/ecto"
+                }
+              ],
+              "owned_packages": {
+                "ecto": "https://hex.pm/api/packages/ecto"
+              }
             }
 
 
@@ -232,7 +318,7 @@ API clients are required to include a text with a link to the [Hex Terms of Serv
 
     + Attributes (User)
         + `organizations` (array, required) - Organizations user is member of.
-            + `organization` (object)
+            + (object)
                 + `name` (string, required) - Organization name.
                 + `role` (string, required) - Role in organization.
 
@@ -251,6 +337,41 @@ API clients are required to include a text with a link to the [Hex Terms of Serv
               "updated_at": "2015-04-05T01:21:49Z",
               "url": "https://hex.pm/api/users/ericmj"
             }
+
+## User Audit Logs [/users/me/audit-logs]
+
+### Fetch User Audit Logs [GET]
+
+Returns audit logs for the currently authenticated user.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (array)
+        + (object)
+            + `action` (string, required) - The action that was performed
+            + `params` (object, optional) - Parameters associated with the action
+            + `user_agent` (string, optional) - User agent of the request
+            + `inserted_at` (string, required) - ISO8601-encoded timestamp
+
+    + Body
+
+            [{
+              "action": "key.generate",
+              "params": {
+                "name": "my_computer"
+              },
+              "user_agent": "Hex/2.0.0 (Elixir/1.14.0)",
+              "inserted_at": "2015-04-05T01:21:49Z"
+            }]
 
 ## Password reset [/users/{username_or_email}/reset]
 
@@ -295,9 +416,6 @@ Returns all public repositories and, if authenticated, all repositories the user
 
             [{
               "name": "acme",
-              "public": false,
-              "active": true,
-              "billing_active": true,
               "inserted_at": "2015-03-24T20:31:35Z",
               "updated_at": "2015-04-02T04:55:41Z"
             }]
@@ -305,13 +423,10 @@ Returns all public repositories and, if authenticated, all repositories the user
 ## Repository [/repos/{name}]
 
 + Parameters
-    + name: plug (string) - Package name
+    + name: acme (string) - Repository name
 
 + Attributes
     + `name` (string, required) - Repository name
-    + `public` (boolean, required) - If repository is public
-    + `active` (boolean, required) - If repository is active
-    + `billing_active` (boolean, required) - If billing is actuve for repository
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
 
@@ -331,12 +446,256 @@ Returns all public repositories and, if authenticated, all repositories the user
 
             {
               "name": "acme",
-              "public": false,
-              "active": true,
-              "billing_active": true,
               "inserted_at": "2015-03-24T20:31:35Z",
               "updated_at": "2015-04-02T04:55:41Z"
             }
+
+# Group Organizations
+
+Organizations allow teams to manage private packages and members.
+
+## Organizations Collection [/orgs]
+
+### List all Organizations [GET]
+
+Returns organizations the authenticated user is a member of.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (array[Organization])
+
+    + Body
+
+            [{
+              "name": "acme",
+              "billing_active": true,
+              "inserted_at": "2017-08-30T17:35:23Z",
+              "updated_at": "2017-08-30T17:35:23Z"
+            }]
+
+## Organization [/orgs/{name}]
+
++ Parameters
+    + name: acme (string) - Organization name
+
++ Attributes
+    + `name` (string, required) - Organization name
+    + `billing_active` (boolean, required) - Whether the organization has active billing
+    + `seats` (number, optional) - Number of seats in the organization's plan
+    + `inserted_at` (string, required) - ISO8601-encoded timestamp
+    + `updated_at` (string, required) - ISO8601-encoded timestamp
+
+### Fetch an Organization [GET]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (Organization)
+
+    + Body
+
+            {
+              "name": "acme",
+              "billing_active": true,
+              "seats": 5,
+              "inserted_at": "2017-08-30T17:35:23Z",
+              "updated_at": "2017-08-30T17:35:23Z"
+            }
+
+### Update an Organization [POST]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
+    + Body
+
+            {
+              "seats": 10
+            }
+
++ Response 200 (application/json)
+
+    + Attributes (Organization)
+
+## Organization Audit Logs [/orgs/{name}/audit-logs]
+
++ Parameters
+    + name: acme (string) - Organization name
+
+### Fetch Organization Audit Logs [GET]
+
+Returns audit logs for the organization.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (array)
+        + (object)
+            + `action` (string, required) - The action that was performed
+            + `params` (object, optional) - Parameters associated with the action
+            + `user_agent` (string, optional) - User agent of the request
+            + `inserted_at` (string, required) - ISO8601-encoded timestamp
+
+    + Body
+
+            [{
+              "action": "organization.member.add",
+              "params": {
+                "username": "newmember"
+              },
+              "user_agent": "Hex/2.0.0 (Elixir/1.14.0)",
+              "inserted_at": "2017-08-30T17:35:23Z"
+            }]
+
+## Organization Members Collection [/orgs/{name}/members]
+
++ Parameters
+    + name: acme (string) - Organization name
+
+### List Organization Members [GET]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (array)
+        + (object)
+            + `username` (string, required)
+            + `email` (string, optional)
+            + `role` (string, required) - One of: `admin`, `write`, `read`
+            + `url` (string, required)
+
+    + Body
+
+            [{
+              "username": "ericmj",
+              "email": "ericmj@mail.com",
+              "role": "admin",
+              "url": "https://hex.pm/api/users/ericmj"
+            }]
+
+### Add Organization Member [POST]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
+    + Body
+
+            {
+              "name": "newmember",
+              "role": "write"
+            }
+
++ Response 204
+
+## Organization Member [/orgs/{name}/members/{username}]
+
++ Parameters
+    + name: acme (string) - Organization name
+    + username: ericmj (string) - Member username
+
+### Get Organization Member [GET]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes
+        + `username` (string, required)
+        + `email` (string, optional)
+        + `role` (string, required) - One of: `admin`, `write`, `read`
+        + `url` (string, required)
+
+    + Body
+
+            {
+              "username": "ericmj",
+              "email": "ericmj@mail.com",
+              "role": "admin",
+              "url": "https://hex.pm/api/users/ericmj"
+            }
+
+### Update Organization Member [POST]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
+    + Body
+
+            {
+              "role": "admin"
+            }
+
++ Response 204
+
+### Remove Organization Member [DELETE]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 204
 
 # Group Packages
 
@@ -351,13 +710,14 @@ This collection is paginated.
 ### List all Packages [GET]
 
 + Parameters
-    + sort: downloads (enum[string], optional)
+    + sort: recent_downloads (enum[string], optional)
         Sorting field
         + Default: name
         + Members
-            + name - Package name, descending
-            + downloads - Number of package downloads, ascending
-            + inserted_at - Package insertion time, ascending
+            + name - Package name, ascending
+            + recent_downloads - Number of package downloads in the last 90 days, descending
+            + total_downloads - Total number of package downloads, descending
+            + inserted_at - Package insertion time, descending
             + updated_at - Package last update time, descending
     + search: phoenix (string, optional)
         Search string, see "Package search" above
@@ -376,25 +736,38 @@ This collection is paginated.
 
             [{
               "name": "plug",
+              "repository": "hexpm",
               "url": "https://hex.pm/api/packages/plug",
               "html_url": "https://hex.pm/packages/plug",
-              "docs_html_url": "https://hexdocs.pm/plug",
+              "docs_html_url": "https://hexdocs.pm/plug/",
               "meta": {
-                "links": {"GitHub": "https://github.com/elixir-lang/plug"},
-                "licenses": ["Apache 2"],
-                "description": "A specification and conveniences for composable modules in between web applications"
+                "links": {"GitHub": "https://github.com/elixir-plug/plug"},
+                "licenses": ["Apache-2.0"],
+                "description": "Compose web applications with functions",
+                "maintainers": []
               },
               "downloads": {
                 "all": 43,
+                "recent": 3092706,
                 "week": 14,
                 "day": 2
               },
               "releases": [{
-                "version": "0.4.1",
-                "url": "https://hex.pm/api/packages/plug/releases/0.4.1"
+                "version": "1.16.1",
+                "url": "https://hex.pm/api/packages/plug/releases/1.16.1",
+                "has_docs": true,
+                "inserted_at": "2024-06-20T13:57:58.725910Z"
               }],
-              "inserted_at": "2015-03-24T20:31:35Z",
-              "updated_at": "2015-04-02T04:55:41Z"
+              "retirements": {},
+              "latest_version": "1.16.1",
+              "latest_stable_version": "1.16.1",
+              "configs": {
+                "mix.exs": "{:plug, \"~> 1.16\"}",
+                "rebar.config": "{plug, \"1.16.1\"}",
+                "erlang.mk": "dep_plug = hex 1.16.1"
+              },
+              "inserted_at": "2014-04-23T18:58:52.000000Z",
+              "updated_at": "2024-06-20T13:58:01.580817Z"
             }]
 
 ## Package [/packages/{name}]
@@ -404,21 +777,31 @@ This collection is paginated.
 
 + Attributes
     + `name` (string, required) - Package name
-    + `repository` (string, optional) - Name of repository the package belongs to, if unset the package belongs to the global repository
-    + `private` (boolean, optional) - The package is private and needs authentication to be visible and fetched
+    + `repository` (string, required) - Name of repository the package belongs to
     + `meta` (object, required) - Package metadata
-        + `maintainers` (array[string], required) - Package maintainers, this attribute is deprecated.
-        + `links` (object, required) - Links related to the package, key is the link name, value is the URL
-        + `licenses` (array[string], required) - Licenses that apply to the package
-        + `description` (string, required) - Package description, recommended to be a single paragraph
-    + `downloads` (object, required) - Number of package downloads
+        + `maintainers` (array[string], optional) - Package maintainers, this attribute is deprecated.
+        + `links` (object, optional) - Links related to the package, key is the link name, value is the URL
+        + `licenses` (array[string], optional) - Licenses that apply to the package
+        + `description` (string, optional) - Package description, recommended to be a single paragraph
+    + `downloads` (object, optional) - Number of package downloads
         + `all` (number, required) - All time
+        + `recent` (number, required) - Last 90 days
         + `week` (number, required) - Last seven days
         + `day` (number, required) - Yesterday
-    + `releases` (array, required)
-        + `release` (object, required) - See Release for details
+    + `releases` (array, optional) - See Release for details
+        + (object)
             + `version` (string, required)
             + `url` (string, required)
+            + `has_docs` (boolean, required) - Whether this release has documentation
+            + `inserted_at` (string, required) - ISO8601-encoded timestamp
+    + `retirements` (object, optional) - Map of version strings to retirement information
+    + `owners` (array, optional) - Package owners (minimal user objects)
+    + `latest_version` (string, required) - Latest version (including pre-releases)
+    + `latest_stable_version` (string, optional) - Latest stable version (excluding pre-releases)
+    + `configs` (object, required) - Dependency snippets for different build tools
+        + `mix.exs` (string, required) - Mix dependency snippet
+        + `rebar.config` (string, required) - Rebar3 dependency snippet
+        + `erlang.mk` (string, required) - Erlang.mk dependency snippet
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
@@ -441,6 +824,7 @@ This collection is paginated.
 
             {
               "name": "plug",
+              "repository": "hexpm",
               "url": "https://hex.pm/api/packages/plug",
               "html_url": "https://hex.pm/packages/plug",
               "docs_html_url": "https://hexdocs.pm/plug",
@@ -451,16 +835,78 @@ This collection is paginated.
               },
               "downloads": {
                 "all": 43,
+                "recent": 20,
                 "week": 14,
                 "day": 2
               },
               "releases": [{
                 "version": "0.4.1",
                 "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
+                "has_docs": true,
+                "inserted_at": "2014-04-23T18:58:54Z"
               }],
+              "retirements": {
+                "0.4.0": {
+                  "reason": "security",
+                  "message": "CVE-XXXX-YYYY, see https://example.com/advisory"
+                }
+              },
+              "owners": [{
+                "username": "ericmj",
+                "email": "ericmj@mail.com",
+                "url": "https://hex.pm/api/users/ericmj"
+              }],
+              "latest_version": "0.4.1",
+              "latest_stable_version": "0.4.1",
+              "configs": {
+                "mix.exs": "{:plug, \"~> 0.4.1\"}",
+                "rebar.config": "{plug, \"0.4.1\"}",
+                "erlang.mk": "dep_plug = hex 0.4.1"
+              },
               "inserted_at": "2015-03-24T20:31:35Z",
               "updated_at": "2015-04-02T04:55:41Z"
             }
+
+## Package Audit Logs [/packages/{name}/audit-logs]
+
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
++ Parameters
+    + name: plug (string) - Package name
+
+### Fetch Package Audit Logs [GET]
+
+Returns audit logs for the package.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (array)
+        + (object)
+            + `action` (string, required) - The action that was performed
+            + `params` (object, optional) - Parameters associated with the action
+            + `user_agent` (string, optional) - User agent of the request
+            + `inserted_at` (string, required) - ISO8601-encoded timestamp
+
+    + Body
+
+            [{
+              "action": "release.publish",
+              "params": {
+                "package": "plug",
+                "version": "0.4.1"
+              },
+              "user_agent": "Hex/2.0.0 (Elixir/1.14.0)",
+              "inserted_at": "2014-04-23T18:58:54Z"
+            }]
 
 # Group Package Release
 
@@ -480,15 +926,21 @@ Also available under /repos/{repository} for packages belonging to a specific re
 
 + Attributes
     + `version` (string, required) - Release version, should be a [Semantic Version](http://semver.org/)
+    + `checksum` (string, required) - SHA-256 checksum of the package tarball, hex-encoded (lowercase)
     + `has_docs` (boolean, required) - `true` if this release has associated documentation
     + `meta` (object, required) - Release metadata
+        + `app` (string, required) - OTP application name
         + `build_tools` (array[string], required) - Names of build tools that can build the package
-    + `dependencies` (array, required) - Releases dependencies
-        + `dependency` (object, required)
-            + `name` (string, required) - Dependency's package name
+        + `elixir` (string, optional) - Elixir version requirement
+    + `requirements` (object, required) - Release dependencies, keyed by package name
+        + `{package_name}` (object, required)
             + `requirement` (string, required) - [Version requirement](http://elixir-lang.org/docs/stable/elixir/Version.html) on dependency
             + `optional` (boolean, required) - An optional dependency only has to be satisfied if a package higher up the chain also requires it
             + `app` (string, required) - OTP application name, usually the dependency name but can differ
+    + `configs` (object, required) - Dependency snippets for different build tools
+        + `mix.exs` (string, required) - Mix dependency snippet
+        + `rebar.config` (string, required) - Rebar3 dependency snippet
+        + `erlang.mk` (string, required) - Erlang.mk dependency snippet
     + `retirement` (object, optional) - Retirement status, if not set the release is not retired
         + `reason` (enum[string], required) - Reason for retirement
             + Members
@@ -498,10 +950,13 @@ Also available under /repos/{repository} for packages belonging to a specific re
                 + `deprecated`
                 + `renamed`
         + `message` (string, optional) - An additional, clarifying message for the retirement
+    + `publisher` (object, optional) - User who published this release
+        + `username` (string, required)
+        + `email` (string, optional)
+        + `url` (string, required)
     + `downloads` (number, required) - Number of downloads of the release
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
-    + `docs_url` (string, optional) - URL to docs tarball
     + `url` (string, required)
     + `html_url` (string, optional)
     + `docs_html_url` (string, optional)
@@ -522,27 +977,57 @@ Also available under /repos/{repository} for packages belonging to a specific re
     + Body
 
             {
-              "package_name": "plug",
               "version": "0.4.1",
+              "checksum": "abc123def456...",
               "has_docs": true,
               "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
               "package_url": "https://hex.pm/api/packages/plug",
               "html_url": "https://hex.pm/packages/plug/0.4.1",
               "docs_html_url": "https://hexdocs.pm/plug/0.4.1",
               "meta": {
-                "build_tools": ["mix"]
+                "app": "plug",
+                "build_tools": ["mix"],
+                "elixir": "~> 1.0"
               },
-              "dependencies": {
+              "requirements": {
                 "cowboy": {
                   "requirement": "~> 1.0",
                   "optional": true,
                   "app": "cowboy"
                 }
-              }
+              },
+              "configs": {
+                "mix.exs": "{:plug, \"~> 0.4.1\"}",
+                "rebar.config": "{plug, \"0.4.1\"}",
+                "erlang.mk": "dep_plug = hex 0.4.1"
+              },
+              "retirement": {
+                "reason": "security",
+                "message": "CVE-XXXX-YYYY, see https://example.com/advisory"
+              },
+              "publisher": {
+                "username": "ericmj",
+                "email": "ericmj@mail.com",
+                "url": "https://hex.pm/api/users/ericmj"
+              },
               "downloads": 16,
               "inserted_at": "2014-04-23T18:58:54Z",
               "updated_at": "2015-04-26T15:26:23Z"
             }
+
+### Revert a Release [DELETE]
+
+Reverts (deletes) a release. This is only allowed within one hour of publishing.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 204
 
 ## Publishing Releases [/publish]
 
@@ -569,22 +1054,36 @@ Will also create a new package or update an existing one. See the package tarbal
 
             {
               "version": "0.4.1",
+              "checksum": "abc123def456...",
               "has_docs": false,
               "url": "https://hex.pm/api/packages/plug/releases/0.4.1",
               "package_url": "https://hex.pm/api/packages/plug",
               "html_url": "https://hex.pm/packages/plug/0.4.1",
               "docs_html_url": "https://hexdocs.pm/plug/0.4.1",
               "meta": {
-                "build_tools": ["mix"]
+                "app": "plug",
+                "build_tools": ["mix"],
+                "elixir": "~> 1.0"
               },
-              "dependencies": {
+              "requirements": {
                 "cowboy": {
                   "requirement": "~> 1.0",
                   "optional": true,
                   "app": "cowboy"
                 }
-              }
-              "downloads": 16,
+              },
+              "configs": {
+                "mix.exs": "{:plug, \"~> 0.4.1\"}",
+                "rebar.config": "{plug, \"0.4.1\"}",
+                "erlang.mk": "dep_plug = hex 0.4.1"
+              },
+              "retirement": null,
+              "publisher": {
+                "username": "ericmj",
+                "email": "ericmj@mail.com",
+                "url": "https://hex.pm/api/users/ericmj"
+              },
+              "downloads": 0,
               "inserted_at": "2014-04-23T18:58:54Z",
               "updated_at": "2014-04-23T18:58:54Z"
             }
@@ -670,6 +1169,22 @@ Also available under /repos/{repository} for packages belonging to a specific re
     + version: 0.4.1 (string)
         Release version, should be a Semantic Version
 
+### Get Package Documentation [GET]
+
+Returns a redirect to the documentation tarball URL.
+
++ Request
+
+    + Header
+
+            Accept: application/json
+
++ Response 302
+
+    + Header
+
+            Location: https://repo.hex.pm/docs/plug-0.4.1.tar.gz
+
 ### Publish Package Documentation [POST]
 
 NOTE: Below are implementation details of hex.pm.
@@ -732,21 +1247,26 @@ Also available under /repos/{repository} for packages belonging to a specific re
             [{
               "username": "ericmj",
               "email": "ericmj@mail.com",
+              "full_name": "Eric Meadows-Jönsson",
+              "handles": {
+                "GitHub": "https://github.com/ericmj",
+                "Twitter": "https://twitter.com/emjii"
+              },
               "level": "full",
               "inserted_at": "2015-04-05T01:21:49Z",
               "updated_at": "2015-04-05T01:21:49Z",
               "url": "https://hex.pm/api/users/ericmj"
             }]
 
-## Package Owner [/packages/{name}/owners/{email}]
+## Package Owner [/packages/{name}/owners/{username}]
 
 Also available under /repos/{repository} for packages belonging to a specific repository.
 
 + Parameters
     + name: plug (string)
         Package name
-    + email: ericmj@mail.com (string)
-        User account email, should be a valid email address belonging to an existing user
+    + username: ericmj (string)
+        Username of the user to add/remove as owner
 
 + Attributes
     + level: maintainer (enum[string], optional)
@@ -755,6 +1275,37 @@ Also available under /repos/{repository} for packages belonging to a specific re
         + Members
             + full - Full owner
             + maintainer - Maintainer owner
+
+### Fetch a Package Owner [GET]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (User)
+        + `level` (enum[string], required) - Ownership level.
+
+    + Body
+
+            {
+              "username": "ericmj",
+              "email": "ericmj@mail.com",
+              "full_name": "Eric Meadows-Jönsson",
+              "handles": {
+                "GitHub": "https://github.com/ericmj"
+              },
+              "level": "full",
+              "inserted_at": "2015-04-05T01:21:49Z",
+              "updated_at": "2015-04-05T01:21:49Z",
+              "url": "https://hex.pm/api/users/ericmj"
+            }
 
 ### Add a Package Owner [PUT]
 
@@ -815,6 +1366,12 @@ API Keys are used to authenticate requests (see Authentication section for more 
                   "resource": "read"
                 }
               ],
+              "revoke_at": null,
+              "last_use": {
+                "ip": "192.168.1.1",
+                "user_agent": "Hex/2.0.0 (Elixir/1.14.0) (OTP/25.0)",
+                "used_at": "2014-04-21T18:00:00Z"
+              },
               "inserted_at": "2014-04-21T17:20:12Z",
               "updated_at": "2014-04-21T17:20:12Z",
               "url": "https://hex.pm/api/keys/my_computer"
@@ -861,12 +1418,6 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
             {
               "name": "my_computer",
-              "permissions": [
-                {
-                  "domain": "api",
-                  "resource": "read"
-                }
-              ],
               "secret": "e2bfe5e65b9235acebe06df8027905c0",
               "authing_key": false,
               "permissions": [
@@ -875,10 +1426,25 @@ API Keys are used to authenticate requests (see Authentication section for more 
                   "resource": "write"
                 }
               ],
+              "revoke_at": null,
               "inserted_at": "2014-04-21T17:20:12Z",
               "updated_at": "2014-04-21T17:20:12Z",
               "url": "https://hex.pm/api/keys/my_computer"
             }
+
+### Remove all API Keys [DELETE]
+
+Removes all API keys for the authenticated user.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 204
 
 ## API Key [/keys/{name}]
 
@@ -889,15 +1455,20 @@ API Keys are used to authenticate requests (see Authentication section for more 
 + Attributes
     + `name` (string, required) - Key name
     + `secret` (string, optional) - Only available immediately after creation, the user secret for the key
+    + `authing_key` (boolean, required) - Whether this key is the one being used for the current request
     + `permissions` (array, required) - List of permissions the key has
-      + `permission` (object)
+      + (object)
         + `domain` (enum[string], required) - The domain of the permission
             + Members
                 + `api` - Gives permission to actions on the API (can be specified with `resource` values `write` and `read`, default is `write`)
                 + `repository` - Gives permission to actions on a specific repository specified in the `resource`
                 + `repositories` -  Gives permission to actions on all repositories the user has access to, the `resource` is omitted
         + `resource` (string, optional)
-    + `revoked_at` (string, optional) - If revoked, the ISO8601-encoded timestamp when it was revoked
+    + `revoke_at` (string, optional) - If set, the ISO8601-encoded timestamp when the key will be automatically revoked
+    + `last_use` (object, optional) - Information about the last time this key was used
+        + `used_at` (string, required) - ISO8601-encoded timestamp
+        + `ip` (string, required) - IP address of the request
+        + `user_agent` (string, required) - User-Agent header of the request
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
     + `url` (string, required)
@@ -928,6 +1499,12 @@ API Keys are used to authenticate requests (see Authentication section for more 
                   "resource": "write"
                 }
               ],
+              "revoke_at": null,
+              "last_use": {
+                "ip": "192.168.1.1",
+                "user_agent": "Hex/2.0.0 (Elixir/1.14.0) (OTP/25.0)",
+                "used_at": "2014-04-21T18:00:00Z"
+              },
               "inserted_at": "2014-04-21T17:20:12Z",
               "updated_at": "2014-04-21T17:20:12Z",
               "url": "https://hex.pm/api/keys/my_computer"
@@ -943,4 +1520,335 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
++ Response 200 (application/json)
+
+    Returns the revoked key.
+
+    + Attributes (API Key)
+
+    + Body
+
+            {
+              "name": "my_computer",
+              "authing_key": false,
+              "permissions": [
+                {
+                  "domain": "api",
+                  "resource": "write"
+                }
+              ],
+              "revoke_at": null,
+              "inserted_at": "2014-04-21T17:20:12Z",
+              "updated_at": "2014-04-21T17:20:12Z",
+              "url": "https://hex.pm/api/keys/my_computer"
+            }
+
+## Organization API Keys Collection [/orgs/{name}/keys]
+
++ Parameters
+    + name: acme (string) - Organization name
+
+### List Organization API Keys [GET]
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (array[API Key])
+
+    + Body
+
+            [{
+              "name": "ci_server",
+              "authing_key": false,
+              "permissions": [
+                {
+                  "domain": "repository",
+                  "resource": "acme"
+                }
+              ],
+              "revoke_at": null,
+              "inserted_at": "2017-08-30T17:35:23Z",
+              "updated_at": "2017-08-30T17:35:23Z",
+              "url": "https://hex.pm/api/orgs/acme/keys/ci_server"
+            }]
+
+### Create Organization API Key [POST]
+
++ Request
+
+    This request requires authentication.
+
+    + Attributes
+        + `name` (string, required)
+        + `permissions` (array, required)
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
+    + Body
+
+            {
+              "name": "ci_server",
+              "permissions": [
+                {
+                  "domain": "repository",
+                  "resource": "acme"
+                }
+              ]
+            }
+
++ Response 201 (application/json)
+
+    + Attributes (API Key)
+        + `secret` - The key secret
+
+    + Body
+
+            {
+              "name": "ci_server",
+              "secret": "e2bfe5e65b9235acebe06df8027905c0",
+              "authing_key": false,
+              "permissions": [
+                {
+                  "domain": "repository",
+                  "resource": "acme"
+                }
+              ],
+              "revoke_at": null,
+              "inserted_at": "2017-08-30T17:35:23Z",
+              "updated_at": "2017-08-30T17:35:23Z",
+              "url": "https://hex.pm/api/orgs/acme/keys/ci_server"
+            }
+
+# Group Miscellaneous
+
+## Short URL [/short_url]
+
+### Create Short URL [POST]
+
+Creates a shortened URL.
+
++ Request (application/json)
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
+    + Body
+
+            {
+              "url": "https://hex.pm/packages/plug/1.0.0"
+            }
+
++ Response 200 (application/json)
+
+    + Attributes
+        + `short_code` (string, required) - The short code
+        + `short_url` (string, required) - The full shortened URL
+
+    + Body
+
+            {
+              "short_code": "abc123",
+              "short_url": "https://hex.pm/l/abc123"
+            }
+
+## Auth [/auth]
+
+### Verify Authentication [GET]
+
+Verifies that the provided authentication token is valid and has the required permissions.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
 + Response 204
+
+    Authentication is valid.
+
++ Response 401 (application/json)
+
+    Authentication failed.
+
+    + Body
+
+            {
+              "status": 401,
+              "message": "failed to authorize"
+            }
+
+# Group OAuth
+
+OAuth2 Device Authorization Grant ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)) enables CLI tools to authenticate users without requiring them to enter credentials directly into the terminal. Instead, users authenticate via a web browser.
+
+## Device Authorization [/oauth/device_authorization]
+
+### Initiate Device Authorization [POST]
+
+Initiates the OAuth2 Device Authorization flow. Returns a device code for polling and a user code for the user to enter in their browser.
+
++ Request (application/x-www-form-urlencoded)
+
+    + Attributes
+        + `client_id` (string, required) - The OAuth client identifier
+        + `scope` (string, optional) - Space-separated list of requested scopes (default: `api:read`)
+        + `name` (string, optional) - A descriptive name for the client (e.g., "Hex (hostname)")
+
+    + Body
+
+            client_id=78ea6566-89fd-481e-a1d6-7d9d78eacca8&scope=api:read
+
++ Response 200 (application/json)
+
+    + Attributes
+        + `device_code` (string, required) - The device verification code
+        + `user_code` (string, required) - The code the user should enter (e.g., "ABCD-1234")
+        + `verification_uri` (string, required) - The URI where the user should enter the code
+        + `verification_uri_complete` (string, optional) - URI with user_code embedded
+        + `expires_in` (number, required) - Lifetime of the device_code in seconds (typically 600)
+        + `interval` (number, required) - Minimum polling interval in seconds (typically 5)
+
+    + Body
+
+            {
+              "device_code": "GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS",
+              "user_code": "WDJBMJHT",
+              "verification_uri": "https://hex.pm/oauth/device",
+              "verification_uri_complete": "https://hex.pm/oauth/device?user_code=WDJBMJHT",
+              "expires_in": 600,
+              "interval": 5
+            }
+
+## Token [/oauth/token]
+
+### Request Token [POST]
+
+Exchanges credentials for access and refresh tokens. Supports multiple grant types:
+
+**Device Code Grant** (`grant_type=urn:ietf:params:oauth:grant-type:device_code`): Polls to exchange the device code for tokens. The client should poll at the interval specified in the device authorization response.
+
+**Refresh Token Grant** (`grant_type=refresh_token`): Exchanges a refresh token for a new access token.
+
++ Request (application/x-www-form-urlencoded)
+
+    + Attributes
+        + `grant_type` (string, required) - Grant type: `urn:ietf:params:oauth:grant-type:device_code` or `refresh_token`
+        + `client_id` (string, required) - The OAuth client identifier
+        + `device_code` (string, optional) - Required for device_code grant
+        + `refresh_token` (string, optional) - Required for refresh_token grant
+
+    + Body (Device Code Grant)
+
+            grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS&client_id=78ea6566-89fd-481e-a1d6-7d9d78eacca8
+
+    + Body (Refresh Token Grant)
+
+            grant_type=refresh_token&refresh_token=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...&client_id=78ea6566-89fd-481e-a1d6-7d9d78eacca8
+
++ Response 200 (application/json)
+
+    Returned when the token request is successful.
+
+    + Attributes
+        + `access_token` (string, required) - The access token for API requests
+        + `refresh_token` (string, optional) - The refresh token for obtaining new access tokens
+        + `token_type` (string, required) - Always "Bearer"
+        + `expires_in` (number, required) - Access token lifetime in seconds
+        + `scope` (string, required) - Space-separated list of granted scopes
+
+    + Body
+
+            {
+              "access_token": "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...",
+              "refresh_token": "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...",
+              "token_type": "Bearer",
+              "expires_in": 3600,
+              "scope": "api:read"
+            }
+
++ Response 400 (application/json)
+
+    Returned while waiting for user authorization or on error.
+
+    + Attributes
+        + `error` (enum[string], required)
+            + Members
+                + `authorization_pending` - User has not yet completed authorization
+                + `slow_down` - Client is polling too frequently, increase interval
+                + `access_denied` - User denied the authorization request
+                + `expired_token` - The device code has expired
+                + `invalid_grant` - Invalid or malformed device code or refresh token
+        + `error_description` (string, required) - Human-readable error description
+
+    + Body
+
+            {
+              "error": "authorization_pending",
+              "error_description": "Authorization pending"
+            }
+
+## Token Revocation [/oauth/revoke]
+
+### Revoke Token [POST]
+
+Revokes an access token or refresh token.
+
++ Request (application/x-www-form-urlencoded)
+
+    + Attributes
+        + `token` (string, required) - The token to revoke (access or refresh token)
+        + `client_id` (string, required) - The OAuth client identifier
+
+    + Body
+
+            token=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...&client_id=78ea6566-89fd-481e-a1d6-7d9d78eacca8
+
++ Response 200 (application/json)
+
+    Token successfully revoked (or was already invalid). Returns 200 OK even for invalid tokens per RFC 7009.
+
+    + Body
+
+            {}
+
+## Token Revocation by Hash [/oauth/revoke_by_hash]
+
+### Revoke Token by Hash [POST]
+
+Revokes a token using the refresh token hash. This allows revocation when the actual token value is not available (e.g., when only a hash was stored for security).
+
++ Request (application/x-www-form-urlencoded)
+
+    + Attributes
+        + `token_hash` (string, required) - SHA-256 hash of the refresh token
+
+    + Body
+
+            token_hash=abc123def456...
+
++ Response 200 (application/json)
+
+    Token successfully revoked (or was already invalid).
+
+    + Body
+
+            {}
