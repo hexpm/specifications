@@ -6,6 +6,8 @@
   * [New registry format](./registry-v2.md)
   * [Tarball format](./package_tarball.md)
   * [Package metadata](./package_metadata.md)
+## Related specifications
+
   * [purl (Package URL) format](./package-url.md)
 
 ## Repositories and mirrors
