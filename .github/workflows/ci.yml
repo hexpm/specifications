@@ -25,7 +25,7 @@ jobs:
           sed -i '1i #include <cstdint>' packages/drafter/src/utils/so/JsonIo.cc
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --target drafter
-          sudo cp build/drafter /usr/local/bin/
+          sudo cp $(find build -name drafter -type f -executable) /usr/local/bin/
 
       - name: Validate API Blueprint
         run: |
