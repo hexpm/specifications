@@ -21,6 +21,8 @@ jobs:
         run: |
           git clone --branch v5.1.0 --depth 1 --recursive https://github.com/apiaryio/drafter.git /tmp/drafter
           cd /tmp/drafter
+          # Fix missing <cstdint> include for GCC 13+
+          sed -i '1i #include <cstdint>' packages/drafter/src/utils/so/JsonIo.cc
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --target drafter
           sudo cp build/drafter /usr/local/bin/
