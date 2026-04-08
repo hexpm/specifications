@@ -71,10 +71,10 @@ Any endpoint implementation for Hex should support SSL termination by default, t
 ##### OAuth2 Token
 
 ```
-$ curl -H "Authorization: token" https://hex.pm/api
+$ curl -H "Authorization: Bearer token" https://hex.pm/api
 ```
 
-OAuth2 tokens are obtained via the [Device Authorization Grant (RFC 8628)](https://datatracker.ietf.org/doc/html/rfc8628). See the OAuth section below for details. OAuth tokens have read-only permissions by default; write operations require two-factor authentication via the `x-hex-otp` header.
+OAuth2 tokens are obtained via the [Device Authorization Grant (RFC 8628)](https://datatracker.ietf.org/doc/html/rfc8628). See the OAuth section below for details. OAuth2 tokens must be sent with the `Bearer` prefix in the `Authorization` header. OAuth tokens have read-only permissions by default; write operations require two-factor authentication via the `x-hex-otp` header.
 
 ##### API Token
 
@@ -717,6 +717,7 @@ This collection is paginated.
             + name - Package name, ascending
             + recent_downloads - Number of package downloads in the last 90 days, descending
             + total_downloads - Total number of package downloads, descending
+            + downloads - Alias for `total_downloads`
             + inserted_at - Package insertion time, descending
             + updated_at - Package last update time, descending
     + search: phoenix (string, optional)
@@ -1444,7 +1445,33 @@ Removes all API keys for the authenticated user.
 
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
-+ Response 204
++ Response 200 (application/json)
+
+    Returns the authing key.
+
+    + Attributes (API Key)
+
+    + Body
+
+            {
+              "name": "my_computer",
+              "authing_key": true,
+              "permissions": [
+                {
+                  "domain": "api",
+                  "resource": "write"
+                }
+              ],
+              "revoke_at": null,
+              "last_use": {
+                "ip": "192.168.1.1",
+                "user_agent": "Hex/2.0.0 (Elixir/1.14.0) (OTP/25.0)",
+                "used_at": "2014-04-21T18:00:00Z"
+              },
+              "inserted_at": "2014-04-21T17:20:12Z",
+              "updated_at": "2014-04-21T17:20:12Z",
+              "url": "https://hex.pm/api/keys/my_computer"
+            }
 
 ## API Key [/keys/{name}]
 
@@ -1653,17 +1680,15 @@ Creates a shortened URL.
               "url": "https://hex.pm/packages/plug/1.0.0"
             }
 
-+ Response 200 (application/json)
++ Response 201 (application/json)
 
     + Attributes
-        + `short_code` (string, required) - The short code
-        + `short_url` (string, required) - The full shortened URL
+        + `url` (string, required) - The full shortened URL
 
     + Body
 
             {
-              "short_code": "abc123",
-              "short_url": "https://hex.pm/l/abc123"
+              "url": "https://hex.pm/l/abc123"
             }
 
 ## Auth [/auth]
@@ -1682,8 +1707,6 @@ Verifies that the provided authentication token is valid and has the required pe
             Authorization: e2bfe5e65b9235acebe06df8027905c0
 
 + Response 204
-
-    Authentication is valid.
 
 + Response 401 (application/json)
 
@@ -1756,13 +1779,9 @@ Exchanges credentials for access and refresh tokens. Supports multiple grant typ
         + `device_code` (string, optional) - Required for device_code grant
         + `refresh_token` (string, optional) - Required for refresh_token grant
 
-    + Body (Device Code Grant)
+    + Body
 
             grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS&client_id=78ea6566-89fd-481e-a1d6-7d9d78eacca8
-
-    + Body (Refresh Token Grant)
-
-            grant_type=refresh_token&refresh_token=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...&client_id=78ea6566-89fd-481e-a1d6-7d9d78eacca8
 
 + Response 200 (application/json)
 
