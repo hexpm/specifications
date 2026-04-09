@@ -1386,6 +1386,8 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
     + Attributes
         + `name` (string, required)
+        + `permissions` (array, optional) - List of permissions for the key
+        + `revoke_at` (string, optional) - ISO8601-encoded timestamp when the key should be automatically revoked. Must be in the future.
 
     + Header
 
@@ -1401,7 +1403,8 @@ API Keys are used to authenticate requests (see Authentication section for more 
                   "domain": "api",
                   "resource": "write"
                 }
-              ]
+              ],
+              "revoke_at": "2024-05-21T17:20:12Z"
             }
 
 + Response 201 (application/json)
@@ -1427,7 +1430,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
                   "resource": "write"
                 }
               ],
-              "revoke_at": null,
+              "revoke_at": "2024-05-21T17:20:12Z",
               "inserted_at": "2014-04-21T17:20:12Z",
               "updated_at": "2014-04-21T17:20:12Z",
               "url": "https://hex.pm/api/keys/my_computer"
@@ -1616,6 +1619,7 @@ Removes all API keys for the authenticated user.
     + Attributes
         + `name` (string, required)
         + `permissions` (array, required)
+        + `revoke_at` (string, optional) - ISO8601-encoded timestamp when the key should be automatically revoked. Must be in the future.
 
     + Header
 
@@ -1631,7 +1635,8 @@ Removes all API keys for the authenticated user.
                   "domain": "repository",
                   "resource": "acme"
                 }
-              ]
+              ],
+              "revoke_at": "2024-05-21T17:20:12Z"
             }
 
 + Response 201 (application/json)
@@ -1651,7 +1656,7 @@ Removes all API keys for the authenticated user.
                   "resource": "acme"
                 }
               ],
-              "revoke_at": null,
+              "revoke_at": "2024-05-21T17:20:12Z",
               "inserted_at": "2017-08-30T17:35:23Z",
               "updated_at": "2017-08-30T17:35:23Z",
               "url": "https://hex.pm/api/orgs/acme/keys/ci_server"
