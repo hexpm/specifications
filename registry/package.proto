@@ -23,6 +23,8 @@ message Release {
   // sha256 checksum of outer package tarball
   // required when encoding but optional when decoding
   optional bytes outer_checksum = 5;
+  // Security advisories affecting this release
+  repeated SecurityAdvisory advisories = 6;
 }
 
 message RetirementStatus {
@@ -36,6 +38,25 @@ enum RetirementReason {
   RETIRED_SECURITY = 2;
   RETIRED_DEPRECATED = 3;
   RETIRED_RENAMED = 4;
+}
+
+message SecurityAdvisory {
+  // Advisory identifier (e.g. GHSA-xxxx-xxxx-xxxx or CVE-xxxx-xxxxx)
+  required string id = 1;
+  // Short description of the advisory
+  required string title = 2;
+  // URL to the full advisory
+  required string url = 3;
+  // Severity of the advisory
+  optional AdvisorySeverity severity = 4;
+}
+
+enum AdvisorySeverity {
+  SEVERITY_NONE = 0;
+  SEVERITY_LOW = 1;
+  SEVERITY_MEDIUM = 2;
+  SEVERITY_HIGH = 3;
+  SEVERITY_CRITICAL = 4;
 }
 
 message Dependency {
