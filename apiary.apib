@@ -808,6 +808,24 @@ This collection is paginated.
     + `url` (string, required)
     + `html_url` (string, optional)
     + `docs_html_url` (string, optional)
+    + `security_advisories` (array, optional) - Security advisories affecting this package
+        + (object)
+            + `id` (string, required) - Advisory identifier (e.g. GHSA-xxxx-xxxx-xxxx)
+            + `summary` (string, required) - Short description of the vulnerability
+            + `aliases` (array[string], required) - Alternative identifiers (e.g. CVE IDs)
+            + `published_at` (string, required) - ISO8601-encoded timestamp when first published
+            + `modified_at` (string, required) - ISO8601-encoded timestamp of last modification
+            + `withdrawn_at` (string, optional) - ISO8601-encoded timestamp if advisory was withdrawn
+            + `cvss_vector` (string, optional) - CVSS vector string
+            + `cvss_score` (number, optional) - CVSS score (0.0–10.0)
+            + `cvss_rating` (string, optional) - One of: `none`, `low`, `medium`, `high`, `critical`
+            + `references` (array, required) - External references
+                + (object)
+                    + `type` (string, required) - Reference type
+                    + `url` (string, required) - Reference URL
+            + `affected` (array[string], required) - Version requirements describing affected versions for this package
+            + `api_url` (string, required) - OSV API URL for the advisory
+            + `html_url` (string, required) - OSV web URL for the advisory
 
 ### Fetch a Package [GET]
 
@@ -856,6 +874,21 @@ This collection is paginated.
                 "username": "ericmj",
                 "email": "ericmj@mail.com",
                 "url": "https://hex.pm/api/users/ericmj"
+              }],
+              "security_advisories": [{
+                "id": "GHSA-xxxx-yyyy-zzzz",
+                "summary": "Example vulnerability",
+                "aliases": ["CVE-2024-12345"],
+                "published_at": "2024-01-01T00:00:00Z",
+                "modified_at": "2024-01-02T00:00:00Z",
+                "withdrawn_at": null,
+                "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+                "cvss_score": 7.5,
+                "cvss_rating": "high",
+                "references": [{"type": "ADVISORY", "url": "https://example.com/advisory"}],
+                "affected": [">= 0.4.0 and < 0.4.2"],
+                "api_url": "https://api.osv.dev/v1/vulns/GHSA-xxxx-yyyy-zzzz",
+                "html_url": "https://osv.dev/vulnerability/GHSA-xxxx-yyyy-zzzz"
               }],
               "latest_version": "0.4.1",
               "latest_stable_version": "0.4.1",
@@ -962,6 +995,24 @@ Also available under /repos/{repository} for packages belonging to a specific re
     + `html_url` (string, optional)
     + `docs_html_url` (string, optional)
     + `package_url` (string, required)
+    + `security_advisories` (array, optional) - Security advisories affecting this release
+        + (object)
+            + `id` (string, required) - Advisory identifier (e.g. GHSA-xxxx-xxxx-xxxx)
+            + `summary` (string, required) - Short description of the vulnerability
+            + `aliases` (array[string], required) - Alternative identifiers (e.g. CVE IDs)
+            + `published_at` (string, required) - ISO8601-encoded timestamp when first published
+            + `modified_at` (string, required) - ISO8601-encoded timestamp of last modification
+            + `withdrawn_at` (string, optional) - ISO8601-encoded timestamp if advisory was withdrawn
+            + `cvss_vector` (string, optional) - CVSS vector string
+            + `cvss_score` (number, optional) - CVSS score (0.0–10.0)
+            + `cvss_rating` (string, optional) - One of: `none`, `low`, `medium`, `high`, `critical`
+            + `references` (array, required) - External references
+                + (object)
+                    + `type` (string, required) - Reference type
+                    + `url` (string, required) - Reference URL
+            + `affected` (array[string], required) - Version requirements describing affected versions for this release's package
+            + `api_url` (string, required) - OSV API URL for the advisory
+            + `html_url` (string, required) - OSV web URL for the advisory
 
 ### Fetch a Release [GET]
 
@@ -1012,6 +1063,21 @@ Also available under /repos/{repository} for packages belonging to a specific re
                 "url": "https://hex.pm/api/users/ericmj"
               },
               "downloads": 16,
+              "security_advisories": [{
+                "id": "GHSA-xxxx-yyyy-zzzz",
+                "summary": "Example vulnerability",
+                "aliases": ["CVE-2024-12345"],
+                "published_at": "2024-01-01T00:00:00Z",
+                "modified_at": "2024-01-02T00:00:00Z",
+                "withdrawn_at": null,
+                "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+                "cvss_score": 7.5,
+                "cvss_rating": "high",
+                "references": [{"type": "ADVISORY", "url": "https://example.com/advisory"}],
+                "affected": [">= 0.4.0 and < 0.4.2"],
+                "api_url": "https://api.osv.dev/v1/vulns/GHSA-xxxx-yyyy-zzzz",
+                "html_url": "https://osv.dev/vulnerability/GHSA-xxxx-yyyy-zzzz"
+              }],
               "inserted_at": "2014-04-23T18:58:54Z",
               "updated_at": "2015-04-26T15:26:23Z"
             }
