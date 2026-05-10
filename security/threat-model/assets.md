@@ -24,7 +24,7 @@ Signed protobuf files containing package versions, dependencies, and checksums.
 |-----------|-------------|
 | Location | S3 storage (protobuf files), served via CDN |
 | Impact if compromised | Dependency confusion, version manipulation |
-| Protection | RSA-SHA512 signatures, repository field verification |
+| Protection | RSA-PKCS1-SHA512 signatures, repository field verification |
 
 ### Registry Signing Key
 

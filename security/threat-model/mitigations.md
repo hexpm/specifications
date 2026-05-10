@@ -86,7 +86,7 @@ Addresses: [T3](threats.md#t3-package-tampering)
 
 | Control | Status | Description |
 |---------|--------|-------------|
-| RSA-SHA512 signatures | Implemented | All registry files are signed |
+| RSA-PKCS1-SHA512 signatures | Implemented | All registry files are signed |
 | Public key distribution | Implemented | Public key bundled with clients |
 | Client signature verification | Implemented | Clients verify before trusting metadata. See [Client Flows](client-flows.md#verification-summary) |
 
@@ -238,7 +238,7 @@ Addresses: [T8](threats.md#t8-vulnerable-dependencies-transitive)
 
 | Control | Status | Description |
 |---------|--------|-------------|
-| Advisory database integration | Partial | We submit to OSV but don't yet consume it in hex.pm or clients |
+| Advisory database integration | Partial | Hex.pm ingests OSV advisory data and surfaces it on the website; clients (Mix, Rebar3, Gleam) do not yet consume advisories |
 | Hex.pm as CNA | Implemented | Can issue CVEs for Elixir/Erlang packages via EEF CNA |
 
 See [SDLC - Secure Process](../sdlc/process.md#vulnerability-handling).
@@ -250,7 +250,7 @@ See [SDLC - Secure Process](../sdlc/process.md#vulnerability-handling).
 | `mix hex.audit` (retirement) | Implemented | CLI tool checks for retired packages |
 | `mix hex.audit` (vulnerabilities) | Planned | CLI tool to check for known vulnerabilities |
 | Dependency tree visibility | Implemented | Transitive dependencies shown in metadata |
-| Security advisories on hex.pm | Planned | Advisories displayed on package pages |
+| Security advisories on hex.pm | Implemented | Advisories displayed on package pages at `/packages/:name/advisories` |
 | Hash/version pinning | Implemented | Dependencies can be locked to specific versions and checksums via lock files |
 | SBOM generation | Implemented | Software Bill of Materials documentation |
 | Automated remediation | Planned | Upgrade dependencies to resolve known vulnerabilities |
@@ -292,6 +292,6 @@ Addresses: [T9](threats.md#t9-unmaintainedabandoned-packages)
 | T5: Documentation attacks | Origin separation, CSP, sandboxing | Implemented | Strong coverage |
 | T6: Registry compromise | Access control, monitoring | Implemented | Strong coverage |
 | T7: DoS | Rate limiting, CDN | Implemented | Strong coverage |
-| T8: Vulnerable dependencies | Advisories, CNA, audit tools | Implemented | Strong coverage |
+| T8: Vulnerable dependencies | OSV ingestion, advisories pages, CNA | Partial | Clients do not yet consume advisories |
 | T9: Unmaintained packages | Metadata, retirement status | Partial | Succession process informal |
 | T10: Build pipeline compromise | (Planned: Trusted Publishing) | Planned | Gap - highest priority |

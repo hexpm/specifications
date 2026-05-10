@@ -31,7 +31,7 @@ All clients perform these steps:
 flowchart TD
     A[Fetch registry file] --> B[Decompress gzip]
     B --> C[Parse Signed protobuf]
-    C --> D{Verify RSA-SHA512<br/>signature}
+    C --> D{Verify RSA-PKCS1-SHA512<br/>signature}
     D -->|Valid| E[Parse inner payload]
     D -->|Invalid| F[ABORT - tampering detected]
     E --> G{Repository field<br/>matches?}

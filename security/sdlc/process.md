@@ -78,7 +78,7 @@ The Hex client is integration tested against the hexpm registry.
 | Scanner | Trigger | Scope |
 |---------|---------|-------|
 | CodeQL | Push/PR to main, weekly | GitHub Actions |
-| Zizmor | Push/PR to main | Workflow security |
+| Zizmor | Push/PR to main, weekly | Workflow security |
 
 ### Vulnerability Sources
 

@@ -37,7 +37,8 @@ Access is logged via GCP Cloud Logging and GKE audit logs.
 
 ### Cloud Provider Access
 
-- CI/CD uses OIDC workload identity federation (no long-lived service account keys)
+- Application repository CI/CD uses OIDC workload identity federation (no long-lived service account keys)
+- Infrastructure repository CI/CD uses a long-lived GCP service account key stored as a GitHub Actions secret, scoped per environment
 - Kubernetes access controlled via RBAC
 - Infrastructure changes applied via CI pipeline
 

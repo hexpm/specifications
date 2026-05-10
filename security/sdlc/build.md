@@ -26,7 +26,7 @@ This document describes secure build practices for Hex registry infrastructure.
 |----------|----------------|
 | Checksums | SHA-256 in signed registry |
 | Immutability | Cannot modify after grace period |
-| Registry signing | RSA-SHA512 signatures |
+| Registry signing | RSA-PKCS1-SHA512 signatures |
 
 ## Dependencies
 
@@ -88,11 +88,15 @@ These projects must only use OTP standard library functions or vendor library co
 
 ### Authentication (CI)
 
+Application repositories (`hexpm/hexpm`, `hexpm/hex`, `hexpm/preview`, `hexpm/diff`, `hexpm/hexdocs`) authenticate to GCP using Workload Identity Federation:
+
 | Stage | Method |
 |-------|--------|
 | GCP authentication | Workload Identity Federation (OIDC) |
-| Container Registry | OAuth2 access token |
-| No long-lived secrets | Short-lived tokens from OIDC |
+| Container Registry | Short-lived OAuth2 access token from OIDC |
+| Image build / push | No long-lived service account keys in repo secrets |
+
+The infrastructure repository (`hexpm/hexpm-ops`) authenticates to GCP using a long-lived service account key stored as a GitHub Actions secret, scoped per environment.
 
 ## Related Documentation
 

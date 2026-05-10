@@ -28,7 +28,7 @@ For controls that address threats under these assumptions, see [Mitigations](mit
 |------------|-------------|
 | Cloud providers (Google Cloud, AWS, Fastly) operate securely | Infrastructure compromise outside our control |
 | TLS provides confidentiality and integrity in transit | No additional transport encryption |
-| Cryptographic primitives (RSA, SHA-256) are secure | Signature and checksum schemes depend on this |
+| Cryptographic primitives (RSA, SHA-256, SHA-512) are secure | RSA-PKCS1-SHA512 signatures and SHA-256 checksums depend on this |
 
 ### About Clients
 

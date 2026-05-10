@@ -18,7 +18,7 @@ Provenance answers:
 | Attribute | Tracked | Verifiable | Notes |
 |-----------|---------|------------|-------|
 | Publishing user | Yes | Via audit log | Account that initiated publish |
-| Publish timestamp | Yes | Via registry | Stored in release metadata |
+| Publish timestamp | Yes | Via API | Stored on the release record and exposed via the HTTP API; not part of the signed registry |
 | Publishing IP/client | Yes | Via audit log | Internal only |
 | Source repository | Yes | Metadata only | Maintainer-provided, not verified |
 | Build environment | No | No | Planned with SLSA provenance |

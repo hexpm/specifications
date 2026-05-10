@@ -98,7 +98,10 @@ C4Container
         Container(diff, "diff.hex.pm", "Phoenix/Elixir", "Visual diff between package versions")
 
         ContainerDb(postgres, "PostgreSQL", "Database", "Users, packages, releases, API keys, organizations")
-        ContainerDb(s3, "Object Storage", "S3", "Tarballs, registry files, documentation")
+        ContainerDb(aws_s3, "Registry Storage", "AWS S3", "Tarballs and registry files")
+        ContainerDb(gcs, "Service Storage", "Google Cloud Storage", "Documentation, diff cache, preview cache")
+        Container(sqs_preview, "Preview Event Queue", "AWS SQS", "S3 ObjectCreated/Removed notifications consumed by preview")
+        Container(sqs_docs, "Docs Event Queue", "AWS SQS", "S3 ObjectCreated/Removed notifications consumed by hexdocs")
 
         Container(registry_worker, "Registry Builder", "Elixir Worker", "Rebuilds registry after publishes")
         Container(notification_worker, "Notification Worker", "Elixir Worker", "Sends emails and webhooks")
@@ -109,22 +112,29 @@ C4Container
     Rel(consumer, fastly, "Fetches packages", "HTTPS")
     Rel(maintainer, fastly, "Publishes packages", "HTTPS")
 
-    Rel(fastly, s3, "Registry files", "/names, /versions, /packages/*")
-    Rel(fastly, s3, "Tarballs", "/tarballs/*")
+    Rel(fastly, aws_s3, "Registry files", "/names, /versions, /packages/*")
+    Rel(fastly, aws_s3, "Tarballs", "/tarballs/*")
     Rel(fastly, hexpm_web, "API requests", "/api/*")
-    Rel(fastly, hexdocs, "Documentation", "HTTPS")
+    Rel(fastly, gcs, "Documentation, preview", "HTTPS")
 
     Rel(hexpm_web, postgres, "Reads/writes", "PostgreSQL")
-    Rel(hexpm_web, s3, "Stores packages", "S3 API")
+    Rel(hexpm_web, aws_s3, "Stores packages", "S3 API")
     Rel(hexpm_web, registry_worker, "Triggers rebuild")
     Rel(hexpm_web, notification_worker, "Queues notifications")
 
-    Rel(hexdocs, s3, "Reads docs", "S3 API")
-    Rel(preview, hexpm_web, "Fetches package data", "Internal API")
-    Rel(diff, hexpm_web, "Fetches package versions", "Internal API")
+    Rel(aws_s3, sqs_preview, "ObjectCreated/Removed events")
+    Rel(aws_s3, sqs_docs, "ObjectCreated/Removed events")
+    Rel(hexdocs, sqs_docs, "Consumes tarball/docs events", "SQS")
+    Rel(hexdocs, aws_s3, "Reads tarballs", "S3 API")
+    Rel(hexdocs, gcs, "Writes rendered docs", "GCS API")
+    Rel(preview, sqs_preview, "Consumes tarball events", "SQS")
+    Rel(preview, aws_s3, "Reads tarballs", "S3 API")
+    Rel(preview, gcs, "Writes extracted previews", "GCS API")
+    Rel(diff, fastly, "Fetches tarballs", "repo.hex.pm")
+    Rel(diff, gcs, "Caches diffs", "GCS API")
 
-    Rel(registry_worker, s3, "Writes registry", "S3 API")
-    Rel(notification_worker, email, "Sends email", "SMTP")
+    Rel(registry_worker, aws_s3, "Writes registry", "S3 API")
+    Rel(notification_worker, email, "Sends email", "SendGrid HTTP API")
 
     UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
 ```
@@ -158,8 +168,11 @@ C4Deployment
             Container(diff_prod, "diff.hex.pm", "Phoenix/Elixir", "Diff viewer")
         }
         Deployment_Node(data_tier, "Data Tier", "") {
-            ContainerDb(pg_prod, "PostgreSQL", "Primary + Replica", "Application data")
-            ContainerDb(s3_prod, "S3 Bucket", "Object Storage", "Tarballs, registry, docs")
+            ContainerDb(pg_prod, "PostgreSQL", "Cloud SQL", "Application data")
+            ContainerDb(s3_prod, "Registry Bucket", "AWS S3", "Tarballs and registry files")
+            ContainerDb(gcs_prod, "Service Buckets", "Google Cloud Storage", "Docs, diff cache, preview cache")
+            Container(sqs_preview_prod, "Preview Event Queue", "AWS SQS", "Tarball events for preview")
+            Container(sqs_docs_prod, "Docs Event Queue", "AWS SQS", "Tarball/docs events for hexdocs")
         }
     }
 
@@ -177,9 +190,16 @@ C4Deployment
     Rel(hex_prod, pg_prod, "PostgreSQL")
     Rel(hex_prod, s3_prod, "S3 API")
 
-    Rel(hexdocs_prod, s3_prod, "S3 API")
-    Rel(diff_prod, edge, "Fetch packages", "repo.hex.pm")
-    Rel(preview_prod, s3_prod, "S3 events", "Tarball notifications")
+    Rel(s3_prod, sqs_preview_prod, "ObjectCreated/Removed events")
+    Rel(s3_prod, sqs_docs_prod, "ObjectCreated/Removed events")
+    Rel(hexdocs_prod, sqs_docs_prod, "Consumes events", "SQS")
+    Rel(hexdocs_prod, s3_prod, "Reads tarballs", "S3 API")
+    Rel(hexdocs_prod, gcs_prod, "Writes rendered docs", "GCS API")
+    Rel(diff_prod, edge, "Fetch tarballs", "repo.hex.pm")
+    Rel(diff_prod, gcs_prod, "Diff cache", "GCS API")
+    Rel(preview_prod, sqs_preview_prod, "Consumes events", "SQS")
+    Rel(preview_prod, s3_prod, "Reads tarballs", "S3 API")
+    Rel(preview_prod, gcs_prod, "Writes previews", "GCS API")
 
     Rel(client, trusted_mirror, "Alternative path", "With auth")
     Rel(client, untrusted_mirror, "Alternative path", "NO auth - public only")
@@ -200,7 +220,8 @@ C4Deployment
 |-----------|-------------|---------------|
 | hex.pm API | Package registry API | Authentication, authorization, publishing |
 | hex.pm Web | Web interface | User management, 2FA, session handling |
-| Fastly CDN + S3 | Content delivery and storage | Artifact integrity, signed registry |
+| Fastly CDN + AWS S3 | Content delivery and registry/tarball storage | Artifact integrity, signed registry |
+| Google Cloud Storage | Documentation, diff cache, preview cache | Content isolation |
 | hexdocs.pm | Documentation hosting | Content isolation, XSS prevention |
 | Hex clients | Build tool integrations (mix, rebar3, gleam) | Signature verification, checksum validation |
 | Registry Builder | Background worker | Signs registry files after publish |
@@ -215,7 +236,8 @@ C4Context
     Boundary(trusted, "Trusted Zone") {
         System(hexpm, "hex.pm", "Main application")
         System(fastly, "Fastly CDN", "Edge delivery")
-        SystemDb(s3, "S3 Storage", "Package artifacts")
+        SystemDb(s3, "AWS S3", "Registry + tarballs")
+        SystemDb(gcs, "Google Cloud Storage", "Docs, diff cache, preview cache")
         SystemDb(pg, "PostgreSQL", "Application data")
     }
 
@@ -265,7 +287,7 @@ C4Context
 
 | Path | Protocol | Format | Authentication | Integrity |
 |------|----------|--------|----------------|-----------|
-| Client → Registry files | HTTPS | Protobuf + gzip | None (public) or API key (private) or OAuth2 (private) | RSA-SHA512 signatures |
+| Client → Registry files | HTTPS | Protobuf + gzip | None (public) or API key (private) or OAuth2 (private) | RSA-PKCS1-SHA512 signatures |
 | Client → Tarballs | HTTPS | tar | None (public) or API key (private) or OAuth2 (private) | Checksums |
 | Client → API | HTTPS | JSON | API key (Bearer token) or OAuth | TLS |
 | Browser → Web | HTTPS | HTML | Session cookie | TLS |
@@ -286,7 +308,7 @@ sequenceDiagram
     participant Worker as Registry Builder
     participant CDN as Fastly CDN
 
-    Client->>API: Publish package (OAuth + 2FA)
+    Client->>API: Publish package (Bearer: API key or OAuth access token; OAuth tokens additionally require x-hex-otp)
     API->>API: Validate authentication & authorization
     API->>DB: Store package metadata
     API->>S3: Upload tarball
@@ -310,7 +332,7 @@ sequenceDiagram
     CDN->>S3: Cache miss (if needed)
     S3-->>CDN: Registry files
     CDN-->>Client: Signed registry
-    Client->>Client: Verify RSA-SHA512 signature
+    Client->>Client: Verify RSA-PKCS1-SHA512 signature
     Client->>CDN: Fetch package tarball
     CDN->>S3: Cache miss (if needed)
     S3-->>CDN: Tarball

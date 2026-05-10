@@ -46,7 +46,7 @@ sequenceDiagram
     CDN-->>Client: Compressed data
     Client->>Client: Decompress
     Client->>Client: Parse Signed protobuf
-    Client->>Client: Verify RSA-SHA512 signature
+    Client->>Client: Verify RSA-PKCS1-SHA512 signature
     alt Signature valid
         Client->>Client: Parse inner payload
         Client->>Client: Verify repository field

@@ -55,7 +55,7 @@ flowchart LR
 
 | Property | Description | Status |
 |----------|-------------|--------|
-| Signed registry | Metadata signed with RSA-SHA512 | Implemented |
+| Signed registry | Metadata signed with RSA-PKCS1-SHA512 | Implemented |
 | Checksums | Artifacts have SHA-256 checksums | Implemented |
 | Immutability | Versions cannot be modified after grace period | Implemented |
 | Transparency log | Append-only log of publication events | Planned |

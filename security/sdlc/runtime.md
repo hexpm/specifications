@@ -27,7 +27,8 @@ environment.
 
 | Secret | Storage | Access |
 |--------|---------|--------|
-| GCP service account | GitHub secrets | OIDC workload identity |
+| GCP service account (application repos) | None in repo secrets | OIDC workload identity |
+| GCP service account (infrastructure repo) | GitHub secrets (long-lived JSON key) | Direct credential, scoped per environment |
 | Database credentials | Runtime secrets | Production only |
 
 ### Production
@@ -35,7 +36,8 @@ environment.
 | Aspect | Implementation |
 |--------|----------------|
 | Secrets storage | Encrypted with GCP KMS, stored in infrastructure config |
-| CI/CD access | OIDC workload identity federation (no long-lived keys in repos) |
+| Application repo CI access | OIDC workload identity federation (no long-lived keys) |
+| Infrastructure repo CI access | Long-lived service account key in GitHub Actions secrets, scoped per environment |
 | Environment isolation | Separate credentials for staging and production |
 
 ## Service Ownership

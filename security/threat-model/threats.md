@@ -425,7 +425,7 @@ An attacker compromises the build or CI/CD pipeline of package maintainers, inje
 
 ### Related Controls
 
-See [Supply Chain - Provenance](../supply-chain/provenance.md).
+See [Build Provenance](./mitigations.md#build-provenance) under Supply Chain Integrity and [Supply Chain - Provenance](../supply-chain/provenance.md).
 
 ## Framework Cross-Reference
 

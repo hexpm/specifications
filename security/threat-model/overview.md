@@ -26,7 +26,7 @@ This threat model draws from established supply chain security frameworks:
 
 | Framework | Focus | Reference |
 |-----------|-------|-----------|
-| ENISA | Package manager security risks | [Technical Advisory for Package Managers](https://www.enisa.europa.eu/) |
+| ENISA | Package manager security risks | [Technical Advisory for Secure Use of Package Managers](https://www.enisa.europa.eu/publications/enisa-technical-advisory-for-secure-use-of-package-managers) |
 | OpenSSF | Repository security principles | [Principles for Package Repository Security](https://repos.openssf.org/) |
 | OWASP | Application security risks | [Top 10:2025 A03 - Software Supply Chain Failures](https://owasp.org/Top10/) |
 | NIST SSDF | Secure development practices | [SP 800-218](https://csrc.nist.gov/publications/detail/sp/800-218/final) |

@@ -50,7 +50,7 @@ Command: `mix deps.get`
 
 ### Authentication
 
-Mix/Hex uses OAuth2 Device Authorization Grant ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)) for interactive authentication. OAuth tokens have read-only permissions by default; write operations require 2FA. API keys can still be used directly, especially for CI environments. See [OAuth2 Device Authorization Grant](#6-oauth2-device-authorization-grant) for details.
+Mix/Hex uses OAuth2 Device Authorization Grant ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)) for interactive authentication. `mix hex.user auth` requests the `api repositories` scopes, which include both read and write permissions; write operations additionally require 2FA to be enabled on the account and an OTP code in the `x-hex-otp` header. API keys can still be used directly, especially for CI environments; API keys cannot use 2FA. See [OAuth2 Device Authorization Grant](#6-oauth2-device-authorization-grant) for details.
 
 ### Cache Locations
 
@@ -90,7 +90,7 @@ sequenceDiagram
     alt Has OAuth Token
         Hex->>Hex: Check token expiry (expires within 5 min?)
         opt Token Expired or Expiring Soon
-            Hex->>API: POST /oauth/token<br/>grant_type=refresh_token
+            Hex->>API: POST /api/oauth/token<br/>grant_type=refresh_token
             API-->>Hex: New access_token + refresh_token
             Hex->>Cache: Update hex.config
         end
@@ -115,7 +115,7 @@ sequenceDiagram
             S3-->>CDN: Signed protobuf (gzip)
             CDN-->>HexCore: 200 OK + ETag
 
-            Note over HexCore: Verify RSA-SHA512 signature
+            Note over HexCore: Verify RSA-PKCS1-SHA512 signature
             HexCore->>HexCore: gunzip → decode Signed protobuf
             HexCore->>HexCore: verify(payload, signature, public_key)
 
@@ -202,7 +202,7 @@ Rebar3 uses basic authentication to generate API keys. Unlike Mix/Hex and Gleam,
 
 | Cache | Path | Contents |
 |-------|------|----------|
-| Registry | `~/.cache/rebar3/hex/hexpm/registry/` | Registry protobuf files |
+| Registry index | `~/.cache/rebar3/hex/packages.idx` | ETS index of hex package metadata |
 | Packages | `~/.cache/rebar3/hex/hexpm/packages/` | Downloaded tarballs |
 | Config | `~/.config/rebar3/hex.config` | API keys |
 | Lock | `rebar.lock` | Resolved versions with checksums |
@@ -230,7 +230,7 @@ sequenceDiagram
     CDN-->>HexCore: Versions data
 
     Note over HexCore: Verify signature
-    HexCore->>HexCore: gunzip → verify RSA-SHA512
+    HexCore->>HexCore: gunzip → verify RSA-PKCS1-SHA512
     HexCore-->>Rebar: Package versions list
 
     loop For each dependency
@@ -283,14 +283,14 @@ Command: `gleam build`
 
 ### Authentication
 
-Gleam uses OAuth2 Device Authorization Grant ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)) for interactive authentication. OAuth tokens have read-only permissions by default; write operations require 2FA. API keys can be used via the `HEXPM_API_KEY` environment variable for CI environments. See [OAuth2 Device Authorization Grant](#6-oauth2-device-authorization-grant) for details.
+Gleam uses OAuth2 Device Authorization Grant ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)) for interactive authentication, triggered automatically when an authenticated operation is needed. The Gleam Hex client requests the `api:write` scope (read and write access to the API, no per-repository scope); write operations additionally require 2FA to be enabled on the account and an OTP code in the `x-hex-otp` header. API keys can be used via the `HEXPM_API_KEY` environment variable for CI environments; API keys cannot use 2FA. See [OAuth2 Device Authorization Grant](#6-oauth2-device-authorization-grant) for details.
 
 ### Cache Locations
 
 | Cache | Path | Contents |
 |-------|------|----------|
 | Packages | `~/.cache/gleam/hex/hexpm/packages/` | Downloaded tarballs |
-| Credentials | `~/.cache/gleam/hex/hexpm/credentials` | OAuth refresh token (encrypted with user passphrase) |
+| Credentials | `~/.cache/gleam/hex/hexpm/credentials.toml` | OAuth refresh token (encrypted with a user-supplied local password); legacy API-key file `credentials` is migrated and deleted |
 | Build | `./build/` | Compiled packages |
 | Manifest | `manifest.toml` | Resolved versions with checksums |
 
@@ -404,7 +404,7 @@ sequenceDiagram
     alt Has OAuth Token
         Client->>Client: Check token expiry
         opt Token Expired
-            Client->>API: POST /oauth/token (refresh_token grant)
+            Client->>API: POST /api/oauth/token (refresh_token grant)
             API-->>Client: New access_token + refresh_token
         end
         Client->>Dev: Prompt for 2FA code
@@ -438,7 +438,7 @@ sequenceDiagram
     Worker->>Worker: Rebuild /names protobuf
     Worker->>Worker: Rebuild /versions protobuf
     Worker->>Worker: Rebuild /packages/{name} protobuf
-    Worker->>Worker: Sign all with RSA-SHA512
+    Worker->>Worker: Sign all with RSA-PKCS1-SHA512
     Worker->>Worker: Gzip compress
     Worker->>S3: Upload registry files
 
@@ -494,7 +494,7 @@ sequenceDiagram
     Cache-->>Client: auth_key
 
     alt OAuth exchange enabled (default for hex.pm)
-        Client->>API: POST /oauth/token<br/>grant_type=client_credentials<br/>Authorization: {auth_key}
+        Client->>API: POST /api/oauth/token<br/>grant_type=client_credentials<br/>Authorization: {auth_key}
         API-->>Client: Short-lived access_token
         Client->>Cache: Store token + expiry for org
     end
@@ -563,9 +563,9 @@ Mix/Hex and Gleam use [RFC 8628 OAuth2 Device Authorization Grant](https://datat
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/oauth/device_authorization` | POST | Initiate device flow |
-| `/oauth/token` | POST | Exchange codes for tokens / refresh tokens |
-| `/oauth/revoke` | POST | Revoke tokens |
+| `/api/oauth/device_authorization` | POST | Initiate device flow |
+| `/api/oauth/token` | POST | Exchange codes for tokens / refresh tokens |
+| `/api/oauth/revoke` | POST | Revoke tokens |
 
 ### Token Properties
 
@@ -573,7 +573,7 @@ Mix/Hex and Gleam use [RFC 8628 OAuth2 Device Authorization Grant](https://datat
 |----------|-------|
 | Access token lifetime | Short-lived (configurable) |
 | Refresh token lifetime | Long-lived |
-| Default scope | `api` (includes write permissions) |
+| Scopes requested by clients | `mix hex.user auth`: `api repositories` (full API + per-repository scopes). Gleam: `api:write`. |
 | Write operations | Require 2FA via `x-hex-otp` header |
 
 ### Sequence Diagram
@@ -589,7 +589,7 @@ sequenceDiagram
     Dev->>Client: mix hex.user auth / gleam hex authenticate
 
     Note over Client,API: Step 1: Device Authorization Request
-    Client->>API: POST /oauth/device_authorization<br/>client_id={client_id}<br/>name={client_name}
+    Client->>API: POST /api/oauth/device_authorization<br/>client_id={client_id}<br/>name={client_name}
     API-->>Client: device_code, user_code,<br/>verification_uri, expires_in, interval
 
     Note over Client,Browser: Step 2: User Verification
@@ -611,7 +611,7 @@ sequenceDiagram
 
     Note over Client,API: Step 4: Token Polling
     loop Poll until authorized or expired
-        Client->>API: POST /oauth/token<br/>grant_type=urn:ietf:params:oauth:grant-type:device_code<br/>device_code={device_code}<br/>client_id={client_id}
+        Client->>API: POST /api/oauth/token<br/>grant_type=urn:ietf:params:oauth:grant-type:device_code<br/>device_code={device_code}<br/>client_id={client_id}
         alt Authorization Pending
             API-->>Client: 400 authorization_pending
             Client->>Client: Sleep for interval seconds
@@ -619,7 +619,7 @@ sequenceDiagram
             API-->>Client: 400 slow_down
             Client->>Client: Increase polling interval
         else Access Denied
-            API-->>Client: 400 access_denied
+            API-->>Client: 403 access_denied
             Client-->>Dev: ❌ Authorization denied
         else Expired
             API-->>Client: 400 expired_token
@@ -644,7 +644,7 @@ sequenceDiagram
 
     Client->>Client: Check access_token expiry
     alt Token expires within 5 minutes
-        Client->>API: POST /oauth/token<br/>grant_type=refresh_token<br/>refresh_token={refresh_token}<br/>client_id={client_id}
+        Client->>API: POST /api/oauth/token<br/>grant_type=refresh_token<br/>refresh_token={refresh_token}<br/>client_id={client_id}
         API-->>Client: New access_token, refresh_token,<br/>token_type, expires_in
         Client->>Client: Update stored tokens
     end
