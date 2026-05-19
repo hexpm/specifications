@@ -58,6 +58,9 @@ message SecurityAdvisory {
   optional float cvss_score = 5;
   // OSV API URL for the advisory
   required string api_url = 6;
+  // Other identifiers for the same vulnerability (e.g. a CVE id when the
+  // primary id is a GHSA id, or vice versa).
+  repeated string aliases = 7;
 }
 
 enum AdvisorySeverity {
