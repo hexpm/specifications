@@ -1,7 +1,7 @@
 syntax = "proto2";
 
 message Policy {
-  // Organization (repository) name
+  // Name of repository
   required string repository = 1;
 
   // Policy name within the repository (matches [a-z0-9_\-\.]+)
@@ -16,8 +16,9 @@ message Policy {
   required int64 published_at = 4;
 
   // Whether the policy is publicly readable or restricted to org members.
-  // Read at the edge (Fastly compute) to decide whether to enforce auth
-  // on the fetch.
+  // Read at the edge to decide whether to enforce auth on the fetch.
+  // Adding new Visibility values is a breaking change — old clients will
+  // treat unknown values as PRIVATE per the fail-closed rule.
   required Visibility visibility = 5;
 
   // Categorical advisory rule. If set, deny any release whose maximum
@@ -39,6 +40,7 @@ message Policy {
 }
 
 enum Visibility {
+  // PRIVATE is the safe default; unknown enum values must be treated as PRIVATE.
   VISIBILITY_PRIVATE = 0;
-  VISIBILITY_PUBLIC  = 1;
+  VISIBILITY_PUBLIC = 1;
 }
