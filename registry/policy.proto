@@ -4,7 +4,8 @@ message Policy {
   // Name of repository
   required string repository = 1;
 
-  // Policy name within the repository (matches [a-z0-9_\-\.]+)
+  // Policy name within the repository
+  // (matches ^[a-z0-9][a-z0-9_\-\.]*[a-z0-9]$, length 3..64)
   required string name = 2;
 
   // Optional, free-form description (admin-set, surfaced in CLI/UI)
