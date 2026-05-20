@@ -17,6 +17,9 @@ The following files hold information about the packages in the repository.
 * `/packages/NAME`
   * This file exists for every package in the repository, it contains all the releases of that package and all dependencies of the releases.
   * Encoded using protobuf schema [`Package`](/registry/package.proto).
+* `/repos/<repository>/policies/<name>`
+  * This file may exist for any organization repository, it contains a signed dependency policy that opted-in clients honor at resolution time. See [`policy.md`](/policy.md).
+  * Encoded using protobuf schema [`Policy`](/registry/policy.proto).
 
 All registry files are compressed using `gzip`.
 
