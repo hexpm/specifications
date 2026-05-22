@@ -10,7 +10,7 @@ A `Policy` is a signed resource published by an organization that the Hex client
 
 ## Encoding
 
-The payload is the [`Policy`](/registry/policy.proto) protobuf message, wrapped in a [`Signed`](/registry/signed.proto) envelope (RSA-SHA512 signature against the payload), gzipped, served with `Content-Type: application/octet-stream` and `Content-Encoding: gzip`.
+The payload is the [`Policy`](/registry/policy.proto) protobuf message, wrapped in a [`Signed`](/registry/signed.proto) envelope (RSA-SHA512 signature against the payload), gzipped.
 
 The signing key is the repository's existing signing key — the same key already used to sign `/names`, `/versions`, and `/packages/NAME`. No new key infrastructure.
 
@@ -23,7 +23,7 @@ The `visibility` field controls who can fetch the resource:
 
 The auth decision is made per-object by inspecting the payload's `visibility` field. The path and signing model are identical in both cases.
 
-If the payload cannot be decoded — signature mismatch, unknown enum value, missing required field — the edge MUST fail closed and require authentication.
+If the payload cannot be decoded — signature mismatch, unknown enum value, missing required field — the edge must fail closed and require authentication.
 
 ## Rule semantics
 
@@ -45,6 +45,8 @@ If `cooldown` is set and non-zero, the policy blocks any release whose `publishe
 
 When multiple active policies declare cooldowns, the effective cooldown is the strictest. Local cooldown configuration cannot lower it.
 
+Unlike the advisory and retirement rules, which compose by intersection across active policies, multiple cooldowns compose by taking the strictest (longest) duration.
+
 ## Client behavior
 
 A conformant client:
@@ -52,7 +54,7 @@ A conformant client:
 1. **Reads policy references from multiple opt-in sources** (e.g., project file, environment variable, global config) and composes them (intersection): a release must pass every active policy. The active set is deduplicated on `(repository, name)`.
 2. **Fetches and verifies each active policy** before resolution. Signature verification uses the configured public key for the repository.
 3. **Filters the candidate set at resolution time only.** Lockfile entries are trusted at install; filtering does not apply to already-locked versions.
-4. **Caches each policy independently** with last-known-good fall-back on fetch failure (network, 5xx, signature mismatch). The maximum staleness window SHOULD be at most 30 days — it bounds the suppression window for a network adversary.
+4. **Caches each policy independently** with last-known-good fall-back on fetch failure (network, 5xx, signature mismatch). The maximum staleness window should be at most 30 days — it bounds the suppression window for a network adversary.
 
 ## Cross-references
 
