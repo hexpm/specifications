@@ -102,15 +102,22 @@ The `visibility` field controls who can fetch the resource:
 
 The auth decision is made per-object by inspecting the payload's `visibility` field; the path and signing model are identical in both cases. If the payload cannot be decoded — signature mismatch, unknown enum value, missing required field — the edge must fail closed and require authentication.
 
-### Rule semantics
+### Repository policies
 
-Each policy declares zero or more categorical rules and an optional cooldown. A release is blocked by the policy if **any** of its declared rules blocks the release.
+A policy carries a list of [`RepositoryPolicy`](/registry/policy.proto) entries, one per repository it constrains — in practice `hexpm` (public packages) and the organization's own repository. Each candidate release is matched to the entry whose `repository` equals the release's repository. A release from a repository with no matching entry is unconstrained by the policy.
 
-If `advisory_min_severity` is set, the policy blocks any release whose maximum advisory severity is greater than or equal to `advisory_min_severity`. Severities map 1:1 to `AdvisorySeverity` in [`package.proto`](/registry/package.proto) (`SEVERITY_NONE=0` … `SEVERITY_CRITICAL=4`). Setting this to `0` (`SEVERITY_NONE`) is permitted and blocks any release that has any advisory at all, regardless of declared severity.
+A matched entry has two parts, evaluated in this order for each candidate release `{repository, package, version}`:
 
-If `retirement_reasons` is non-empty, the policy blocks any release whose `retired.reason` is one of the listed values. Reasons map 1:1 to `RetirementReason` in [`package.proto`](/registry/package.proto) (`RETIRED_OTHER=0` … `RETIRED_RENAMED=4`).
+1. **Overrides** (`overrides`) — the final say. An `OVERRIDE_ACTION_ALLOW` override whose `ref` matches the release permits it immediately and **bypasses the restriction**; an `OVERRIDE_ACTION_DENY` override blocks it. When several overrides match, the one with the most specific `requirement` wins (a `requirement`-bearing entry is more specific than a bare-`package` entry).
+2. **Restriction** (`restriction`) — applied to every release in the repository, but **never** to a release permitted by an `ALLOW` override. A release is blocked if any limit fires.
 
-If `cooldown` is set and non-zero, the policy blocks any release whose `published_at` is more recent than `now - cooldown_duration`. The grammar matches the Hex cooldown configuration grammar: `"Nd"`, `"Nw"`, `"Nmo"`, or `"0"`; unset or `"0"` disables the rule.
+A `PackageRef` (used by `Override.ref`) matches a release when its `package` equals the release's package and, if `requirement` is set, the release's version satisfies that requirement.
+
+#### Restriction limits
+
+* `advisory_min_severity` is set and the release's maximum advisory severity is greater than or equal to it. It is an `AdvisorySeverity` (imported from [`package.proto`](/registry/package.proto), `SEVERITY_NONE` … `SEVERITY_CRITICAL`). `SEVERITY_NONE` blocks any release that has any advisory at all.
+* `retirement_reasons` is non-empty and the release's `retired.reason` is one of the listed values. Each is a `RetirementReason` (imported from [`package.proto`](/registry/package.proto), `RETIRED_OTHER` … `RETIRED_RENAMED`).
+* `cooldown` is set and non-zero and the release's `published_at` is more recent than `now - cooldown_duration`. The grammar matches the Hex cooldown configuration grammar: `"Nd"`, `"Nw"`, `"Nmo"`, or `"0"`; `"0"` (or unset) imposes no minimum age. If multiple active policies declare cooldowns, the effective cooldown is the strictest one.
 
 ### Client behavior
 
@@ -121,7 +128,7 @@ A conformant client:
 3. **Filters the candidate set at resolution time only.** Lockfile entries are trusted at install; filtering does not apply to versions already in the lockfile.
 4. **Caches each policy independently** with last-known-good fall-back on fetch failure (network, 5xx, signature mismatch). The maximum staleness window should be at most 30 days, bounding the suppression window for a network adversary.
 
-The advisory and retirement rules compose across active policies by intersection — any active policy can block a release. Cooldowns compose differently: the effective cooldown is the strictest (longest) duration across all active policies, and local cooldown configuration cannot lower it.
+Across the active set, policies compose by intersection: a release survives only if every active policy permits it and no active policy's restriction blocks it. Cooldowns compose by strictest-wins — the effective cooldown is the longest duration across all active policies, and local cooldown configuration cannot lower it.
 
 ## Links
 
