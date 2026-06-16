@@ -77,7 +77,7 @@ flowchart LR
 | Build | Compromised build environment | None (planned: trusted publishing, SLSA provenance) |
 | Publishing | Unauthorized publish, tampering | Authentication, authorization |
 | Distribution | CDN/mirror tampering, MITM | Signed registry, checksums |
-| Consumption | Dependency confusion, typosquatting | Repository field verification, typosquatting detection |
+| Consumption | Dependency confusion, typosquatting, vulnerable/retired versions | Repository field verification, typosquatting detection, advisory CLI reporting and dependency policies (Hex/Mix) |
 
 ## Detailed Documentation
 
