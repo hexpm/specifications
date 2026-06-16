@@ -151,8 +151,8 @@ Addresses: [T5](threats.md#t5-documentation-based-attacks)
 
 | Control | Status | Description |
 |---------|--------|-------------|
-| Separate origin | Implemented | Documentation served from hexdocs.pm |
-| Per-package origin isolation | Planned | Each package's docs served from separate origin to prevent cross-package attacks |
+| Separate origin | Implemented | Documentation served from hexdocs.pm, isolated from the registry origin |
+| Per-package origin isolation | Implemented | Each package's docs served from its own origin so the browser same-origin policy prevents cross-package attacks: public packages at `<package>.hexdocs.pm`, organization packages at `<org>.hexorgs.pm/<package>` |
 | No shared authentication | Implemented | hexdocs.pm has no access to registry sessions |
 
 ### Content Security

@@ -281,7 +281,7 @@ C4Context
 ### Boundary 4: Browser to Documentation
 
 - **Crosses**: User-generated documentation content
-- **Controls**: Separate origin, CSP headers
+- **Controls**: Per-package origin isolation (`<package>.hexdocs.pm`, `<org>.hexorgs.pm/<package>`), CSP headers
 
 ## Communication Protocols
 
