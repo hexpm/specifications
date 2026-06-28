@@ -66,7 +66,7 @@ User-generated HTML documentation.
 |-----------|-------------|
 | Location | S3 storage, served via hexdocs.pm |
 | Impact if compromised | XSS attacks, phishing |
-| Protection | CSP headers, separate origin (planned) |
+| Protection | CSP headers, per-package origin isolation (`<package>.hexdocs.pm`, `<org>.hexorgs.pm/<package>`) |
 
 ### Package Ownership
 

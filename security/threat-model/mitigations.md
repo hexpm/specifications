@@ -151,8 +151,8 @@ Addresses: [T5](threats.md#t5-documentation-based-attacks)
 
 | Control | Status | Description |
 |---------|--------|-------------|
-| Separate origin | Implemented | Documentation served from hexdocs.pm |
-| Per-package origin isolation | Planned | Each package's docs served from separate origin to prevent cross-package attacks |
+| Separate origin | Implemented | Documentation served from hexdocs.pm, isolated from the registry origin |
+| Per-package origin isolation | Implemented | Each package's docs served from its own origin so the browser same-origin policy prevents cross-package attacks: public packages at `<package>.hexdocs.pm`, organization packages at `<org>.hexorgs.pm/<package>` |
 | No shared authentication | Implemented | hexdocs.pm has no access to registry sessions |
 
 ### Content Security
@@ -238,7 +238,7 @@ Addresses: [T8](threats.md#t8-vulnerable-dependencies-transitive)
 
 | Control | Status | Description |
 |---------|--------|-------------|
-| Advisory database integration | Partial | Hex.pm ingests OSV advisory data and surfaces it on the website; clients (Mix, Rebar3, Gleam) do not yet consume advisories |
+| Advisory database integration | Partial | Hex.pm ingests OSV advisory data, surfaces it on the website, and serves it through the registry; consumed by Hex (Elixir/Mix), not yet by Rebar3 or Gleam |
 | Hex.pm as CNA | Implemented | Can issue CVEs for Elixir/Erlang packages via EEF CNA |
 
 See [SDLC - Secure Process](../sdlc/process.md#vulnerability-handling).
@@ -248,13 +248,29 @@ See [SDLC - Secure Process](../sdlc/process.md#vulnerability-handling).
 | Control | Status | Description |
 |---------|--------|-------------|
 | `mix hex.audit` (retirement) | Implemented | CLI tool checks for retired packages |
-| `mix hex.audit` (vulnerabilities) | Planned | CLI tool to check for known vulnerabilities |
+| `mix hex.audit` (advisories) | Implemented | Hex (Elixir/Mix) surfaces security advisories affecting resolved dependencies; not yet in Rebar3 or Gleam |
 | Dependency tree visibility | Implemented | Transitive dependencies shown in metadata |
 | Security advisories on hex.pm | Implemented | Advisories displayed on package pages at `/packages/:name/advisories` |
 | Hash/version pinning | Implemented | Dependencies can be locked to specific versions and checksums via lock files |
 | SBOM generation | Implemented | Software Bill of Materials documentation |
 | Automated remediation | Planned | Upgrade dependencies to resolve known vulnerabilities |
 | Reachability analysis | Planned | Reduce false positives by determining if vulnerable code paths execute |
+
+### Dependency Policies
+
+Client-side enforcement of organization-defined policies, currently available in Hex (Elixir/Mix); not yet in Rebar3 or Gleam. A policy is defined on hex.pm under an organization (or on any self-hosted repo), fetched through the registry at resolution time, and used to filter candidate versions *before* the solver sees them, so blocked versions are simply never selected. See [Client Flows](client-flows.md) for how policies fit into resolution.
+
+| Control | Status | Description |
+|---------|--------|-------------|
+| Policy fetched from registry | Implemented | Active policy resolved via Hex config precedence (`HEX_POLICY` env var, `mix.exs`, then global config); one active policy per project |
+| Cooldown rule | Implemented | Blocks newly published versions until they reach a minimum age; effective cooldown is the strictest of local config and the policy |
+| Advisory rule | Implemented | Blocks versions with security advisories at or above a severity threshold (or with any advisory) |
+| Retirement rule | Implemented | Blocks versions retired for the configured reasons |
+| Package/version overrides | Implemented | Allow/deny exceptions; most specific match wins, an allow exempts the release from the restriction |
+| Lockfile exemption | Implemented | Versions already locked are exempt from filtering, so re-resolution keeps a locked-but-now-blocked entry instead of failing |
+| Policy visibility | Implemented | Public policies are fetchable anonymously; private policies require authentication to the owning organization |
+| Fail-closed enforcement | Implemented | Malformed config, fetch failures (without a cached copy), or 404/401 abort resolution rather than resolving unenforced |
+| `mix hex.policy show` / `why` | Implemented | Summarize the active policy and explain per-version why each is allowed or blocked |
 
 ## Ecosystem Health
 
@@ -292,6 +308,6 @@ Addresses: [T9](threats.md#t9-unmaintainedabandoned-packages)
 | T5: Documentation attacks | Origin separation, CSP, sandboxing | Implemented | Strong coverage |
 | T6: Registry compromise | Access control, monitoring | Implemented | Strong coverage |
 | T7: DoS | Rate limiting, CDN | Implemented | Strong coverage |
-| T8: Vulnerable dependencies | OSV ingestion, advisories pages, CNA | Partial | Clients do not yet consume advisories |
+| T8: Vulnerable dependencies | OSV ingestion, advisory CLI reporting, dependency policies, CNA | Partial | Advisory consumption and policy enforcement in Hex (Elixir/Mix); not yet in Rebar3 or Gleam |
 | T9: Unmaintained packages | Metadata, retirement status | Partial | Succession process informal |
 | T10: Build pipeline compromise | (Planned: Trusted Publishing) | Planned | Gap - highest priority |
