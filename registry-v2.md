@@ -108,27 +108,50 @@ A policy carries a list of [`RepositoryPolicy`](/registry/policy.proto) entries,
 
 A matched entry has two parts, evaluated in this order for each candidate release `{repository, package, version}`:
 
-1. **Overrides** (`overrides`) — the final say. An `OVERRIDE_ACTION_ALLOW` override whose `ref` matches the release permits it immediately and **bypasses the restriction**; an `OVERRIDE_ACTION_DENY` override blocks it. When several overrides match, the one with the most specific `requirement` wins (a `requirement`-bearing entry is more specific than a bare-`package` entry).
-2. **Restriction** (`restriction`) — applied to every release in the repository, but **never** to a release permitted by an `ALLOW` override. A release is blocked if any limit fires.
+1. **Overrides** (`overrides`) — package-scoped decisions and exceptions. A matching `OVERRIDE_ACTION_ALLOW` permits the release and bypasses every policy restriction; `OVERRIDE_ACTION_DENY` blocks it. When several ALLOW or DENY overrides match, the one with the most specific `requirement` wins (a `requirement`-bearing entry is more specific than a bare-package entry). If no final override decides the release, matching ADVISORY, RETIREMENT, and COOLDOWN overrides remove only their selected restriction.
+2. **Restriction** (`restriction`) — applied to every release that was not permitted or blocked by a final override. A release is blocked if any remaining limit fires.
 
-A `PackageRef` (used by `Override.ref`) matches a release when its `package` equals the release's package and, if `requirement` is set, the release's version satisfies that requirement.
+A `PackageRef` matches a release when its `package` equals the release's package and, if `requirement` is set, the release's version satisfies that requirement using Hex version-requirement semantics.
+
+Policy editors should populate an ADVISORY override's `requirement` from the advisory's affected ranges when the override is created. Keeping that recorded scope prevents a later expansion of the same advisory from being accepted without another policy change. Each advisory range uses `and` between its bounds and separate ranges use `or`. `and` binds before `or`, and parentheses aren't valid in Hex version requirements.
+
+Each `Override` action has a fail-closed field contract:
+
+* `OVERRIDE_ACTION_ALLOW` and `OVERRIDE_ACTION_DENY` set neither selector. ALLOW bypasses all policy restrictions, while DENY blocks the release.
+* `OVERRIDE_ACTION_ADVISORY` sets only `advisory_id`. The identifier matches the advisory's primary ID or any alias, case-insensitively. It removes only that advisory, so another advisory affecting the same release is still evaluated.
+* `OVERRIDE_ACTION_RETIREMENT` sets only `retirement_reason`. It accepts the release only while its current retirement reason equals that value. A changed reason is evaluated as a new finding. Changing only the retirement message does not change the match.
+* `OVERRIDE_ACTION_COOLDOWN` sets neither selector. It bypasses only the cooldown declared by this policy. A project's local cooldown still applies independently.
+
+Every override may carry a comment that clients surface as the policy's explanation. Comments must contain at most 500 Unicode code points and must be valid UTF-8 without Unicode control, format, line separator, or paragraph separator characters. Comments on a `VISIBILITY_PUBLIC` policy are public.
+
+Clients ignore an override if it is malformed, has an unknown action or retirement reason, has an invalid package requirement, or sets selector fields that its action does not permit. Ignoring invalid override data keeps the affected release subject to the policy restriction. Older clients continue applying field 3 ALLOW and DENY overrides. They decode newer actions as unknown enum values and ignore their unknown selector and comment fields, so advisory, retirement, and cooldown overrides can't make an older client fail open.
 
 #### Restriction limits
 
 * `advisory_min_severity` is set and the release's maximum advisory severity is greater than or equal to it. It is an `AdvisorySeverity` (imported from [`package.proto`](/registry/package.proto), `SEVERITY_NONE` … `SEVERITY_CRITICAL`). `SEVERITY_NONE` blocks any release that has any advisory at all.
 * `retirement_reasons` is non-empty and the release's `retired.reason` is one of the listed values. Each is a `RetirementReason` (imported from [`package.proto`](/registry/package.proto), `RETIRED_OTHER` … `RETIRED_RENAMED`).
-* `cooldown` is set and non-zero and the release's `published_at` is more recent than `now - cooldown_duration`. The grammar matches the Hex cooldown configuration grammar: `"Nd"`, `"Nw"`, `"Nmo"`, or `"0"`; `"0"` (or unset) imposes no minimum age. If multiple active policies declare cooldowns, the effective cooldown is the strictest one.
+* `cooldown` is set and non-zero and the release's `published_at` is more recent than `now - cooldown_duration`. The grammar matches the Hex cooldown configuration grammar: `"Nd"`, `"Nw"`, `"Nmo"`, or `"0"`; `"0"` (or unset) imposes no minimum age.
 
 ### Client behavior
 
 A conformant client:
 
-1. **Reads policy references from multiple opt-in sources** (e.g. project file, environment variable, global config) and composes them by intersection: a release must pass every active policy. The active set is deduplicated on `(repository, name)`.
-2. **Fetches and verifies each active policy** before resolution, using the configured public key for the repository.
+1. **Reads one policy reference from its opt-in sources** (e.g. project file, environment variable, global config), using the client's documented configuration precedence.
+2. **Fetches and verifies the active policy** before resolution, using the configured public key for the repository.
 3. **Filters the candidate set at resolution time only.** Lockfile entries are trusted at install; filtering does not apply to versions already in the lockfile.
 4. **Caches each policy independently** with last-known-good fall-back on fetch failure (network, 5xx, signature mismatch). The maximum staleness window should be at most 30 days, bounding the suppression window for a network adversary.
 
-Across the active set, policies compose by intersection: a release survives only if every active policy permits it and no active policy's restriction blocks it. Cooldowns compose by strictest-wins — the effective cooldown is the longest duration across all active policies, and local cooldown configuration cannot lower it.
+The active policy and local cooldown compose by strictest-wins. Local cooldown configuration can increase the effective cooldown but cannot lower a cooldown declared by the policy.
+
+### Auditing
+
+Clients expose three audit modes for locked dependencies:
+
+* The default audit reports all advisory and retirement findings without applying dependency policies.
+* The policy-overrides audit starts with all advisory and retirement findings, then reports only findings that are not accepted by a matching ALLOW, ADVISORY, or RETIREMENT override.
+* The policy audit reports only findings rejected by the active policy's advisory severity threshold, retirement reasons, and matching overrides.
+
+The two policy-aware audit modes require an active policy and fail when it cannot be loaded. Project advisory and retirement ignores are additive and are applied after policy evaluation. Policy-aware audit modes cover security advisories and release retirements; they do not audit cooldown restrictions or perform general lockfile validation.
 
 ## Links
 
