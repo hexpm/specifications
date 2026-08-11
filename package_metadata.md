@@ -83,6 +83,17 @@ All keys are strings.
 
       Extra information about the package
 
+  + `secret_scan (kvlist(...)) (optional)`
+
+      Configuration for the repository's secret scanning of the package.
+
+    + `ignore (list(string)) (optional)`
+
+        File path globs whose findings are suppressed. `*` matches within a
+        path segment, `**` spans separators, `?` matches one non-separator
+        character. Intended for paths a package deliberately ships secret-like
+        values in, such as test fixtures.
+
 ### Optional dependencies
 
 An optional dependency will only be used if a package higher up the dependency chain also depends on it (only if that the dependency is not defined as optional as well).
