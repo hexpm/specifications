@@ -124,7 +124,7 @@ Each `Override` action has a fail-closed field contract:
 
 Every override may carry a comment that clients surface as the policy's explanation. Comments must contain at most 500 Unicode code points and must be valid UTF-8 without Unicode control, format, line separator, or paragraph separator characters. Comments on a `VISIBILITY_PUBLIC` policy are public.
 
-Clients ignore an override if it is malformed, has an unknown action or retirement reason, has an invalid package requirement, or sets selector fields that its action does not permit. Ignoring invalid override data keeps the affected release subject to the policy restriction. Older clients continue applying field 3 ALLOW and DENY overrides. They decode newer actions as unknown enum values and ignore their unknown selector and comment fields, so advisory, retirement, and cooldown overrides can't make an older client fail open.
+Clients ignore an override if it is malformed, has an unknown action or retirement reason, has an invalid package requirement, or sets selector fields that its action does not permit. Ignoring invalid override data keeps the affected release subject to the policy restriction. Clients should warn when a loaded policy contains unknown override actions. Older clients continue applying field 3 ALLOW and DENY overrides. They decode newer actions as unknown enum values and ignore their unknown selector and comment fields, so advisory, retirement, and cooldown overrides can't make an older client fail open.
 
 #### Restriction limits
 
