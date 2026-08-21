@@ -266,11 +266,13 @@ Client-side enforcement of organization-defined policies, currently available in
 | Cooldown rule | Implemented | Blocks newly published versions until they reach a minimum age; effective cooldown is the strictest of local config and the policy |
 | Advisory rule | Implemented | Blocks versions with security advisories at or above a severity threshold (or with any advisory) |
 | Retirement rule | Implemented | Blocks versions retired for the configured reasons |
-| Package/version overrides | Implemented | Allow/deny exceptions; most specific match wins, an allow exempts the release from the restriction |
+| Package/version overrides | Implemented | Package and version scoped allow, deny, advisory, retirement, and policy-cooldown overrides; comments are available on every type |
+| Finding-scoped policy overrides | Implemented | Advisory and retirement overrides accept one current identifier or reason without accepting unrelated findings; cooldown overrides don't disable local cooldown configuration |
 | Lockfile exemption | Implemented | Versions already locked are exempt from filtering, so re-resolution keeps a locked-but-now-blocked entry instead of failing |
 | Policy visibility | Implemented | Public policies are fetchable anonymously; private policies require authentication to the owning organization |
 | Fail-closed enforcement | Implemented | Malformed config, fetch failures (without a cached copy), or 404/401 abort resolution rather than resolving unenforced |
 | `mix hex.policy show` / `why` | Implemented | Summarize the active policy and explain per-version why each is allowed or blocked |
+| Policy-aware dependency audit | Implemented | Audits locked advisory and retirement findings against policy overrides and restriction thresholds |
 
 ## Ecosystem Health
 
