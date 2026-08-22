@@ -42,8 +42,9 @@ message RepositoryPolicy {
   optional Restriction restriction = 2;
 
   // Per-package overrides. ALLOW and DENY provide a final decision for the
-  // matching release. ADVISORY, RETIREMENT, and COOLDOWN each bypass only the
-  // selected restriction. Consumers MUST ignore invalid or unknown entries.
+  // matching release. The most specific match wins; the first entry wins ties.
+  // ADVISORY, RETIREMENT, and COOLDOWN each bypass only the selected
+  // restriction. Consumers MUST ignore invalid or unknown entries.
   repeated Override overrides = 3;
 }
 
@@ -57,7 +58,7 @@ message Restriction {
   repeated RetirementReason retirement_reasons = 2 [packed=true];
 
   // Minimum release age ("7d", "2w", "1mo", "0"). Unset or "0" = no
-  // minimum age.
+  // minimum age. A release without published_at does not trigger the cooldown.
   optional string cooldown = 3;
 }
 

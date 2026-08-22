@@ -85,7 +85,7 @@ Individual releases can be retired. Retirement is advisory metadata and does not
 
 A release is retired if the `retired` field is set on `Release`. A `RetirementStatus` has a `RetirementReason` enum and may include a message that clarifies the reason. Clients MUST accept future additions to `RetirementReason`; the protobuf library that generates the files under `registry/` decodes unknown enum values as their integer value.
 
-Clients MUST NOT reject a release solely because it is retired. This preserves repeatable builds that already depend on the release.
+Without an active dependency policy that rejects its current retirement reason, clients MUST NOT reject a release solely because it is retired. This preserves repeatable builds that already depend on the release.
 
 ## Dependency policies
 
@@ -108,7 +108,7 @@ A policy carries a list of [`RepositoryPolicy`](/registry/policy.proto) entries,
 
 A matched entry has two parts, evaluated in this order for each candidate release `{repository, package, version}`:
 
-1. **Overrides** (`overrides`) are package-scoped decisions and exceptions. A matching `OVERRIDE_ACTION_ALLOW` permits the release and bypasses every policy restriction; `OVERRIDE_ACTION_DENY` blocks it. When several ALLOW or DENY overrides match, the one with the most specific `requirement` wins (a `requirement`-bearing entry is more specific than a bare-package entry). If no final override decides the release, matching ADVISORY, RETIREMENT, and COOLDOWN overrides remove only their selected restriction.
+1. **Overrides** (`overrides`) are package-scoped decisions and exceptions. A matching `OVERRIDE_ACTION_ALLOW` permits the release and bypasses every policy restriction; `OVERRIDE_ACTION_DENY` blocks it. When several ALLOW or DENY overrides match, the one with the most specific `requirement` wins (a `requirement`-bearing entry is more specific than a bare-package entry). If several matching overrides have equal specificity, the first one in `overrides` wins. If no final override decides the release, matching ADVISORY, RETIREMENT, and COOLDOWN overrides remove only their selected restriction.
 2. **Restriction** (`restriction`) applies to every release that was not permitted or blocked by a final override. A release is blocked if any remaining limit fires.
 
 A `PackageRef` matches a release when its `package` equals the release's package and, if `requirement` is set, the release's version satisfies that requirement using Hex version-requirement semantics.
@@ -128,7 +128,7 @@ Clients MUST ignore an override if it is malformed, has an unknown action or ret
 
 * `advisory_min_severity` is set and the release's maximum advisory severity is greater than or equal to it. It is an `AdvisorySeverity` (imported from [`package.proto`](/registry/package.proto), `SEVERITY_NONE` … `SEVERITY_CRITICAL`). `SEVERITY_NONE` blocks any release that has any advisory at all.
 * `retirement_reasons` is non-empty and the release's `retired.reason` is one of the listed values. Each is a `RetirementReason` (imported from [`package.proto`](/registry/package.proto), `RETIRED_OTHER` … `RETIRED_RENAMED`).
-* `cooldown` is set and non-zero and the release's `published_at` is more recent than `now - cooldown_duration`. The grammar is `"Nd"`, `"Nw"`, `"Nmo"`, or `"0"`; `"0"` (or unset) imposes no minimum age.
+* `cooldown` is set and non-zero and the release's `published_at` is more recent than `now - cooldown_duration`. The grammar is `"Nd"`, `"Nw"`, `"Nmo"`, or `"0"`; `"0"` (or unset) imposes no minimum age. A release without `published_at` does not trigger the cooldown.
 
 ## Links
 
