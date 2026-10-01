@@ -94,6 +94,13 @@ All keys are strings.
         character. Intended for paths a package deliberately ships secret-like
         values in, such as test fixtures.
 
+  + `build_env (kvlist(string => string)) (optional)`
+
+      Names and versions of the tools that created the package tarball, for
+      example `hex`, `rebar3_hex` or `gleam`. Creating a tarball from the same
+      files with the same tool versions gives the same tarball. Clients don't
+      use it when fetching or building the package.
+
 ### Optional dependencies
 
 An optional dependency will only be used if a package higher up the dependency chain also depends on it (only if that the dependency is not defined as optional as well).
