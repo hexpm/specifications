@@ -95,6 +95,10 @@ Used by: `mix hex.publish`, `rebar3 hex publish`, `gleam publish`
 | API | `GET /packages/NAME` | Check if package exists |
 | API | `GET /users/me` | Get current user (for new packages) |
 | API | `PUT /packages/NAME/owners/USERNAME` | Add first owner (for new packages) |
+| API | `GET /packages/NAME/releases/VERSION/staged` | Poll a staged release until a person approves it |
+| API | `GET /packages/NAME/releases/VERSION/docs/staged` | Poll staged documentation until a person approves it |
+
+When staged publishing applies (see the Staged Publishing section of the HTTP API), the publish endpoints answer with a staged release instead of a release. The `Location` header has the URL to poll.
 
 ### Publishing from CI with Workload Identity
 

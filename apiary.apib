@@ -109,6 +109,20 @@ A workload identity cannot create a public package. An organization workload ide
 
 Releases that a workload identity publishes include the verified OIDC claims in the `oidc_claims` field of the release.
 
+### Staged Publishing
+
+Staged publishing holds a release or its documentation until a person approves it. When staged publishing applies, the server stores the upload as a staged release and does not publish it. A package maintainer with two-factor authentication approves or rejects the staged release on the web interface. A staged release expires after seven days. The API does not approve or reject staged releases.
+
+Staged publishing applies to uploads that authenticate with an API token, with an OAuth token exchanged from an organization API token, or with a workload identity token. It does not apply to uploads that authenticate with an OAuth token for a user and an `x-hex-otp` code. Where the deployment enables the feature, it applies when one of these conditions is true:
+
+  * The package has staged publishing enabled. New packages have it enabled by default.
+  * The organization that owns the private repository requires it for all of its packages.
+  * The registry operators enabled emergency publishing mode. In this mode, staged publishing applies to all releases and documentation of public packages.
+
+When staged publishing applies, an API token cannot revert a release or its documentation. The server answers `403 Forbidden`.
+
+Clients find a staged upload by its response from the publish endpoints. The response has the `Staged Release` attributes, and the `Location` header has the URL of the staged release resource. Clients can poll that URL until the `status` is no longer `staged`.
+
 ### Two-Factor Authentication (2FA)
 
 Write operations may require two-factor authentication. When 2FA is required, the server will respond with `403 Forbidden` and a message indicating that a one-time password is needed. The client should then retry the request with the `x-hex-otp` header containing the TOTP code.
@@ -1053,7 +1067,7 @@ Also available under /repos/{repository} for packages belonging to a specific re
 
 ### Revert a Release [DELETE]
 
-Reverts (deletes) a release. This is only allowed within one hour of publishing.
+Reverts (deletes) a release. This is only allowed within one hour of publishing. A workload identity token cannot revert a release.
 
 + Request
 
@@ -1065,11 +1079,26 @@ Reverts (deletes) a release. This is only allowed within one hour of publishing.
 
 + Response 204
 
++ Response 403 (application/json)
+
+    Staged publishing applies to the package and the request authenticated with an API token. See the Staged Publishing section.
+
+    + Body
+
+            {
+              "status": 403,
+              "message": "This package uses staged publishing, so API keys can't revert it. Revert with your Hex account and a two-factor code."
+            }
+
 ## Publishing Releases [/publish]
 
 ### Publish a Release [POST]
 
 Will also create a new package or update an existing one. See the package tarball specification for details about the request contents.
+
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
+The request can authenticate with a workload identity token. When staged publishing applies, the server does not publish the release. It answers `201 Created` with the `Staged Release` attributes instead of the `Release` attributes. See the Staged Publishing section.
 
 + Request
 
@@ -1123,6 +1152,111 @@ Will also create a new package or update an existing one. See the package tarbal
               "downloads": 0,
               "inserted_at": "2014-04-23T18:58:54Z",
               "updated_at": "2014-04-23T18:58:54Z"
+            }
+
+## Staged Release [/packages/{name}/releases/{version}/staged]
+
+A release that waits for approval. See the Staged Publishing section.
+
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
++ Parameters
+    + name: plug (string)
+        Package name
+    + version: 0.4.1 (string)
+        Release version
+
++ Attributes
+    + `name` (string, required) - Package name
+    + `version` (string, required) - Release version
+    + `kind` (enum[string], required) - What waits for approval
+        + Members
+            + `release` - A release, which can include its documentation
+            + `docs` - Documentation for a release
+    + `status` (enum[string], required)
+        + Members
+            + `staged` - Waits for approval
+            + `approved` - A person approved it and the server published it
+            + `rejected` - A person rejected it
+            + `expired` - Nobody approved it before `expires_at`
+    + `checksum` (string, required) - SHA-256 checksum of the uploaded tarball, hex-encoded (lowercase). For `kind` `release`, this is the outer checksum of the package tarball. For `kind` `docs`, this is the checksum of the documentation tarball. A client can show it so that the person who approves can compare it with the checksum on the web interface.
+    + `approval_checksum` (string, required) - Identifies the exact content of the staged release and the credential that staged it. The value changes when the package tarball, the documentation attached to the staged release, or the credential changes. The server refuses an approval or rejection made for an older value, so a person cannot approve content that changed after they reviewed it. A client that polls this resource can compare the value with the one from the publish response to detect that the release was staged again. Clients must treat the value as opaque.
+    + `expires_at` (string, required) - ISO8601-encoded timestamp
+    + `url` (string, required) - URL of this resource
+    + `html_url` (string, required) - URL of the approval page on the web interface
+
+### Fetch a Staged Release [GET]
+
+The request must authenticate with the credential that staged the release, or as a user who can approve it. The server answers `404 Not Found` to other callers. After approval, rejection, or expiry, the resource stays available with the final `status`.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (Staged Release)
+
+    + Body
+
+            {
+              "name": "plug",
+              "version": "0.4.1",
+              "kind": "release",
+              "status": "staged",
+              "checksum": "abc123def456...",
+              "approval_checksum": "abc123...",
+              "expires_at": "2014-04-30T18:58:54Z",
+              "url": "https://hex.pm/api/packages/plug/releases/0.4.1/staged",
+              "html_url": "https://hex.pm/dashboard/staged-releases/hexpm/plug/0.4.1"
+            }
+
+## Staged Release Documentation [/packages/{name}/releases/{version}/docs/staged]
+
+Documentation that waits for approval. The resource has the `Staged Release` attributes with `kind` `docs`.
+
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
++ Parameters
+    + name: plug (string)
+        Package name
+    + version: 0.4.1 (string)
+        Release version
+
+### Fetch Staged Documentation [GET]
+
+The same rules as for Fetch a Staged Release apply.
+
++ Request
+
+    This request requires authentication.
+
+    + Header
+
+            Accept: application/json
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    + Attributes (Staged Release)
+
+    + Body
+
+            {
+              "name": "plug",
+              "version": "0.4.1",
+              "kind": "docs",
+              "status": "staged",
+              "checksum": "abc123def456...",
+              "approval_checksum": "abc123...",
+              "expires_at": "2014-04-30T18:58:54Z",
+              "url": "https://hex.pm/api/packages/plug/releases/0.4.1/docs/staged",
+              "html_url": "https://hex.pm/dashboard/staged-releases/hexpm/plug/0.4.1/docs"
             }
 
 ## Retiring Releases [/packages/{name}/releases/{version}/retire]
@@ -1230,6 +1364,8 @@ The uploaded tarball will be served under https://repo.hex.pm/docs/{package}-{ve
 
 The tarball contents will be served at http://hexdocs.pm/{package}/{version}. The latest upload will be served at http://hexdocs.pm/{package}.
 
+The request can authenticate with a workload identity token. When staged publishing applies, or the release is itself a staged release, the server does not publish the documentation. It answers `201 Created` with the `Staged Release` attributes and `kind` `docs`, and the `Location` header has the URL of the staged documentation. See the Staged Publishing section.
+
 + Request
 
     This request requires authentication.
@@ -1247,6 +1383,8 @@ The tarball contents will be served at http://hexdocs.pm/{package}/{version}. Th
             Location: https://hex.pm/api/packages/plug/releases/0.4.1/docs
 
 ### Remove Package Documentation [DELETE]
+
+A workload identity token cannot remove documentation. When staged publishing applies to the package, an API token cannot remove documentation, and the server answers `403 Forbidden`.
 
 + Response 204
 
