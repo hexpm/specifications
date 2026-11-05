@@ -118,7 +118,7 @@ Used by: `mix hex.owner`, `rebar3 hex owner`, `gleam owner`
 
 ### Authentication
 
-**OAuth2 Device Authorization** (used by: `mix hex.user auth`, `gleam authenticate`):
+**OAuth2 Device Authorization** (used by: `mix hex.user auth`, `rebar3 hex user auth`, `gleam authenticate`):
 
 | Type | Endpoint | Purpose |
 |------|----------|---------|
@@ -127,11 +127,13 @@ Used by: `mix hex.owner`, `rebar3 hex owner`, `gleam owner`
 | API | `POST /oauth/revoke` | Revoke token |
 | API | `POST /oauth/revoke_by_hash` | Revoke token by hash |
 
-**API Key Generation** (used by: `rebar3 hex user auth`):
+**API Key Exchange** (used by: `mix hex.organization auth`):
 
 | Type | Endpoint | Purpose |
 |------|----------|---------|
-| API | `POST /keys` | Create API key (with Basic Auth) |
+| API | `POST /oauth/token` | Exchange an organization API key for a short-lived token (`grant_type=client_credentials`) |
+
+The API does not accept Basic authentication.
 
 ### API Key Management
 
@@ -180,11 +182,9 @@ Used by: `mix hex.docs`
 
 ### User Management
 
-Used by: `rebar3 hex user register`, `rebar3 hex user reset_password`
-
 | Type | Endpoint | Purpose |
 |------|----------|---------|
-| API | `POST /users` | Create new user account |
 | API | `GET /users/NAME` | Get user information |
 | API | `GET /users/me` | Get authenticated user |
-| API | `POST /users/NAME/reset` | Request password reset |
+
+Users register and reset passwords on the web interface. The API does not support these actions.

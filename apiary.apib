@@ -64,7 +64,7 @@ Most responses return an `ETag` header. Many responses will also return a `Last-
 
 ### Authentication
 
-There are three ways to authenticate requests in the Hex API: OAuth2 tokens obtained via the Device Authorization Grant, API tokens, or Basic Authentication with a username and password. Failed authentication attempts will return `401 Unauthorized`. Resources accessed without proper authentication will return a `403 Forbidden` except for some resources that return `404 Not Found` to prevent leaking sensitive data.
+There are two ways to authenticate requests in the Hex API: OAuth2 tokens and API tokens. Failed authentication attempts will return `401 Unauthorized`. Resources accessed without proper authentication will return a `403 Forbidden` except for some resources that return `404 Not Found` to prevent leaking sensitive data.
 
 Any endpoint implementation for Hex should support SSL termination by default, to prevent user credentials from being intercepted by third parties.
 
@@ -84,13 +84,9 @@ $ curl -H "Authorization: token" https://hex.pm/api
 
 API tokens can be created via the web interface or the `/keys` endpoint. They provide direct access without the OAuth flow.
 
-##### Basic Authentication (Deprecated)
+##### Basic Authentication (Removed)
 
-```
-$ curl -u "username" https://hex.pm/api
-```
-
-Basic authentication is deprecated and only allowed on some resources, specifically ones used to generate API tokens. This is because basic authentication is computationally expensive and less secure than using API tokens. New integrations should use OAuth2 Device Authorization instead.
+The server does not accept Basic authentication. A request with Basic credentials gets `401 Unauthorized` with a message that Basic authentication is disabled. Clients should use OAuth2 Device Authorization instead.
 
 ### Two-Factor Authentication (2FA)
 
@@ -194,52 +190,7 @@ Returns available API endpoints and documentation URL.
 
 Authenticated requests require a User account. A User is required to publish packages but not to consume packages from the package manager.
 
-## Users collection [/users]
-
-### Create a User [POST]
-
-A successful user creation will send a confirmation email to the given email address. The email will contain a link to follow in order to confirm the email and activate the account. The account will be usable once activated.
-
-A user can be recreated for a given `username` and `email` if it has not been activated yet.
-
-API clients are required to include a text with a link to the [Hex Terms of Service](https://hex.pm/policies/termsofservice) that ensures users agree to the terms. If clients do not follow this requirement their access to the API may be limited. If using the API specification to sign up to non-official Hex services, this text is not required, but others services may have similar requirements.
-
-+ Request (application/json)
-
-    + Attributes
-        + `username` (string, required) - Only allows any alphanumeric (`[A-Za-z0-9]`) and the following characters: `_-.`. Case insensitive.
-        + `password` (string, required) - Should simply be a printable UTF-8 string
-        + `email` (string, required) - Should be a valid email address
-
-    + Header
-
-            Accept: application/json
-
-    + Body
-
-            {
-              "username": "ericmj",
-              "password": "hunter42",
-              "email": "ericmj@mail.com"
-            }
-
-+ Response 201 (application/json)
-
-    + Attributes (User)
-
-    + Header
-
-            Location: https://hex.pm/api/users/ericmj
-
-    + Body
-
-            {
-              "username": "ericmj",
-              "email": "ericmj@mail.com",
-              "inserted_at": "2015-04-05T01:21:49Z",
-              "updated_at": "2015-04-05T01:21:49Z",
-              "url": "https://hex.pm/api/users/ericmj"
-            }
+The API does not create users or reset passwords. Users do this on the web interface.
 
 ## User [/users/{username_or_email}]
 
@@ -372,27 +323,6 @@ Returns audit logs for the currently authenticated user.
               "user_agent": "Hex/2.0.0 (Elixir/1.14.0)",
               "inserted_at": "2015-04-05T01:21:49Z"
             }]
-
-## Password reset [/users/{username_or_email}/reset]
-
-+ Parameters
-    + username_or_email: ericmj (string)
-        Can be either a username or the email address associated with a User
-
-### Reset User password [POST]
-
-Will start the process to reset a User's password. An email will be send to the User's primary email address containin a link to follow and will lead to a form where a new password can be chosen.
-
-+ Request (application/json)
-
-    This request requires authentication.
-
-    + Header
-
-            Accept: application/json
-            Authorization: e2bfe5e65b9235acebe06df8027905c0
-
-+ Response 204 (application/json)
 
 # Group Repositories
 
@@ -1448,7 +1378,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
 + Request
 
-    This request requires basic authentication and is allowed to be made even if the account email has not yet been confirmed.
+    This request requires an OAuth token from the Device Authorization Grant. It is allowed to be made even if the account email has not yet been confirmed. A user with two-factor authentication must send the `x-hex-otp` header.
 
     + Attributes
         + `name` (string, required)
@@ -1458,7 +1388,8 @@ API Keys are used to authenticate requests (see Authentication section for more 
     + Header
 
             Accept: application/json
-            Authorization: Basic ZXJpY21qOmh1bnRlcjQy
+            Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+            x-hex-otp: 123456
 
     + Body
 
