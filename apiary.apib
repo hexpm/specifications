@@ -203,6 +203,7 @@ Returns available API endpoints and documentation URL.
     + Attributes
         + `packages_url` (string, required) - URL template for packages collection
         + `package_url` (string, required) - URL template for a single package
+        + `package_retirement_url` (string, required) - URL template to retire all releases of a package
         + `package_release_url` (string, required) - URL template for a package release
         + `package_owners_url` (string, required) - URL template for package owners
         + `keys_url` (string, required) - URL for API keys collection
@@ -214,6 +215,7 @@ Returns available API endpoints and documentation URL.
             {
               "packages_url": "https://hex.pm/api/packages",
               "package_url": "https://hex.pm/api/packages/{name}",
+              "package_retirement_url": "https://hex.pm/api/packages/{name}/retire",
               "package_release_url": "https://hex.pm/api/packages/{name}/releases/{version}",
               "package_owners_url": "https://hex.pm/api/packages/{name}/owners",
               "keys_url": "https://hex.pm/api/keys",
@@ -595,7 +597,35 @@ Returns audit logs for the organization.
               "role": "write"
             }
 
-+ Response 204
++ Response 202 (application/json)
+
+    The server sends an invitation to the user. The user becomes a member when they accept the invitation. This request requires the credentials of a user. An organization API token cannot invite members.
+
+    + Attributes
+        + `username` (string, required)
+        + `url` (string, required)
+        + `role` (string, required) - Role the user gets when they accept the invitation
+        + `expires_at` (string, required) - ISO8601-encoded timestamp when the invitation expires
+
+    + Body
+
+            {
+              "username": "newmember",
+              "url": "https://hex.pm/api/users/newmember",
+              "role": "write",
+              "expires_at": "2017-09-06T17:35:23Z"
+            }
+
++ Response 429 (application/json)
+
+    The organization invited this user in the last 24 hours, or too many invitations were sent to this user or by the inviting user recently.
+
+    + Body
+
+            {
+              "status": 429,
+              "message": "this organization can invite this user once every 24 hours"
+            }
 
 ## Organization Member [/orgs/{name}/members/{username}]
 
@@ -1258,6 +1288,46 @@ The same rules as for Fetch a Staged Release apply.
               "url": "https://hex.pm/api/packages/plug/releases/0.4.1/docs/staged",
               "html_url": "https://hex.pm/dashboard/staged-releases/hexpm/plug/0.4.1/docs"
             }
+
+## Retiring All Releases [/packages/{name}/retire]
+
+Also available under /repos/{repository} for packages belonging to a specific repository.
+
++ Parameters
+    + name: plug (string)
+        Package name
+
+### Mark All Releases as Retired [POST]
+
++ Request
+
+    This request requires authentication.
+
+    Marks all releases of the package as retired. By default, the server does not change releases that are already retired.
+
+    + Attributes
+        + `reason` (enum[string], required) - Reason for retiring the releases
+            + Members
+                + `other`
+                + `invalid`
+                + `security`
+                + `deprecated`
+                + `renamed`
+        + `message` (string, optional) - An additional, clarifying message for the retirement
+        + `replace` (boolean, optional) - If `true`, also replace the retirement of releases that are already retired. Default: `false`
+
+    + Header
+
+            Authorization: e2bfe5e65b9235acebe06df8027905c0
+
+    + Body
+
+            {
+              "reason": "deprecated",
+              "message": "This package has been deprecated in favor of ecto."
+            }
+
++ Response 204
 
 ## Retiring Releases [/packages/{name}/releases/{version}/retire]
 
@@ -2039,6 +2109,7 @@ Exchanges credentials for access and refresh tokens. Supports multiple grant typ
         + `token_type` (string, required) - Always "Bearer"
         + `expires_in` (number, required) - Access token lifetime in seconds
         + `scope` (string, required) - Space-separated list of granted scopes
+        + `organization_reauth_required` (array[string], optional) - Organizations that require single sign-on, for which the token did not get access. The client must authorize these organizations again with `POST /oauth/organization_authorization`
 
     + Body
 
@@ -2143,6 +2214,53 @@ Revokes a token using the refresh token hash. This allows revocation when the ac
     + Body
 
             {}
+
+## Organization Authorization [/oauth/organization_authorization]
+
+### Request Organization Authorization [POST]
+
+Starts single sign-on for organizations that require it. Use it when a token response lists organizations in `organization_reauth_required`. The user opens `verification_uri` in a browser and signs in with the identity provider of each organization. The next refresh of the token then gets access to these organizations.
+
++ Request (application/json)
+
+    This request requires an OAuth token from the Device Authorization Grant. The server refuses API tokens and tokens from the Client Credentials Grant.
+
+    + Attributes
+        + `organizations` (array[string], required) - Names of the organizations to authorize
+
+    + Header
+
+            Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+
+    + Body
+
+            {
+              "organizations": ["acme"]
+            }
+
++ Response 201 (application/json)
+
+    + Attributes
+        + `verification_uri` (string, required) - URL that the user opens in a browser
+        + `expires_in` (number, required) - Seconds until the URL expires
+
+    + Body
+
+            {
+              "verification_uri": "https://hex.pm/organizations/authorize?code=abc123",
+              "expires_in": 600
+            }
+
++ Response 422 (application/json)
+
+    None of the organizations require single sign-on for this user, or the request did not authenticate with a Device Authorization Grant token. The server gives the same answer for an organization that does not exist, one the user is not a member of, and one that does not require single sign-on.
+
+    + Body
+
+            {
+              "status": 422,
+              "message": "Organization authentication is not required for the requested organizations"
+            }
 
 # Group OIDC
 

@@ -119,6 +119,7 @@ Used by: `mix hex.retire`, `rebar3 hex retire`, `gleam retire`
 
 | Type | Endpoint | Purpose |
 |------|----------|---------|
+| API | `POST /packages/NAME/retire` | Retire all releases |
 | API | `POST /packages/NAME/releases/VERSION/retire` | Retire a release |
 | API | `DELETE /packages/NAME/releases/VERSION/retire` | Unretire a release |
 
@@ -143,6 +144,7 @@ Used by: `mix hex.owner`, `rebar3 hex owner`, `gleam owner`
 | API | `POST /oauth/token` | Poll for token / refresh token |
 | API | `POST /oauth/revoke` | Revoke token |
 | API | `POST /oauth/revoke_by_hash` | Revoke token by hash |
+| API | `POST /oauth/organization_authorization` | Sign in to organizations that require single sign-on |
 
 **API Key Exchange** (used by: `mix hex.organization auth`):
 
