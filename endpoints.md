@@ -148,7 +148,7 @@ Used by: `mix hex.organization key`, `rebar3 hex user key`, `rebar3 hex organiza
 | API | `DELETE /keys` | Delete all keys |
 | API | `GET /auth` | Test key permissions |
 
-For organization keys, use `/orgs/ORG/keys` instead.
+For organization keys, use `/orgs/ORG/keys` instead. Creating and deleting keys requires an OAuth token from the Device Authorization Grant. The API refuses API keys for these requests.
 
 ### Package Information
 

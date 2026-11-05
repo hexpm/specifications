@@ -82,7 +82,7 @@ OAuth2 tokens are obtained via the [Device Authorization Grant (RFC 8628)](https
 $ curl -H "Authorization: token" https://hex.pm/api
 ```
 
-API tokens can be created via the web interface or the `/keys` endpoint. They provide direct access without the OAuth flow.
+API tokens are created via the web interface or the `/keys` endpoint. They provide direct access without the OAuth flow. Clients must treat a token as an opaque string. Tokens differ in length and format, and new tokens start with `hex_`.
 
 ##### Basic Authentication (Removed)
 
@@ -1335,6 +1335,24 @@ Also available under /repos/{repository} for packages belonging to a specific re
 
 API Keys are used to authenticate requests (see Authentication section for more details). A key has a name used to identify it and a secret that is used for the actual authentication.
 
+Only a user who signed in can create or revoke keys. The request must authenticate with an OAuth token from the Device Authorization Grant. The server refuses API tokens and OAuth tokens from the Client Credentials Grant with `403 Forbidden`, so a leaked key cannot create keys that outlive it or revoke other keys.
+
+Each key has a list of permissions. A permission has a `domain` and, for some domains, a `resource`:
+
+| Domain | Resource | Allows |
+|--------|----------|--------|
+| `api` | none, `read`, or `write` | `read`: all API reads. `write` or none: all API actions, which includes all write domains below |
+| `package` | `NAME` or `REPOSITORY/NAME` | Publish and change owners of one package, and all API reads |
+| `publish` | none, `NAME`, or `REPOSITORY/NAME` | Publish, revert, retire, and unretire releases, and publish documentation. With a resource, only for that package |
+| `owners` | none, `NAME`, or `REPOSITORY/NAME` | Add and remove package owners. With a resource, only for that package |
+| `members` | none | Add, remove, and change the role of organization members |
+| `administration` | none | Change the number of seats of an organization |
+| `repository` | `ORGANIZATION` | Fetch from the private repository of the organization. Only for organization keys |
+| `repositories` | none | Fetch from all private repositories the owner can access. Only for organization keys |
+| `docs` | `ORGANIZATION` | Fetch private documentation of the organization |
+
+The server refuses the `keys` domain. A key is limited by what its owner can do when the key is used. For an organization key, the role of the member who creates the key also limits which permissions the key can get.
+
 ## API Keys Collection [/keys]
 
 ### List all API Keys [GET]
@@ -1357,6 +1375,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
             [{
               "name": "my_computer",
               "authing_key": true,
+              "token_format": "v1",
               "permissions": [
                 {
                   "domain": "api",
@@ -1409,7 +1428,7 @@ API Keys are used to authenticate requests (see Authentication section for more 
     The `secret` will be sent only once. It should be stored after creating the API key. Subsequent responses to GET requests will not include the `secret`.
 
     + Attributes (API Key)
-        + `secret` - The key secret, a 32 character hex encoded string
+        + `secret` - The key secret
 
     + Header
 
@@ -1419,8 +1438,9 @@ API Keys are used to authenticate requests (see Authentication section for more 
 
             {
               "name": "my_computer",
-              "secret": "e2bfe5e65b9235acebe06df8027905c0",
+              "secret": "hex_e2bfe5e65b9235acebe06df8027905c09a3b1c2d",
               "authing_key": false,
+              "token_format": "v2",
               "permissions": [
                 {
                   "domain": "api",
@@ -1439,38 +1459,28 @@ Removes all API keys for the authenticated user.
 
 + Request
 
-    This request requires authentication.
+    This request requires an OAuth token from the Device Authorization Grant. A user with two-factor authentication must send the `x-hex-otp` header.
 
     + Header
 
-            Authorization: e2bfe5e65b9235acebe06df8027905c0
+            Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+            x-hex-otp: 123456
 
 + Response 200 (application/json)
 
-    Returns the authing key.
+    + Body
 
-    + Attributes (API Key)
+            null
+
++ Response 403 (application/json)
+
+    The request authenticated with an API token.
 
     + Body
 
             {
-              "name": "my_computer",
-              "authing_key": true,
-              "permissions": [
-                {
-                  "domain": "api",
-                  "resource": "write"
-                }
-              ],
-              "revoke_at": null,
-              "last_use": {
-                "ip": "192.168.1.1",
-                "user_agent": "Hex/2.0.0 (Elixir/1.14.0) (OTP/25.0)",
-                "used_at": "2014-04-21T18:00:00Z"
-              },
-              "inserted_at": "2014-04-21T17:20:12Z",
-              "updated_at": "2014-04-21T17:20:12Z",
-              "url": "https://hex.pm/api/keys/my_computer"
+              "status": 403,
+              "message": "API keys cannot revoke API keys, revoke the key on https://hex.pm/dashboard/keys"
             }
 
 ## API Key [/keys/{name}]
@@ -1483,6 +1493,10 @@ Removes all API keys for the authenticated user.
     + `name` (string, required) - Key name
     + `secret` (string, optional) - Only available immediately after creation, the user secret for the key
     + `authing_key` (boolean, required) - Whether this key is the one being used for the current request
+    + `token_format` (enum[string], required) - Format of the secret
+        + Members
+            + `v1` - 32 hex characters without a prefix
+            + `v2` - `hex_` prefix
     + `permissions` (array, required) - List of permissions the key has
       + (object)
         + `domain` (enum[string], required) - The domain of the permission
@@ -1490,6 +1504,12 @@ Removes all API keys for the authenticated user.
                 + `api` - Gives permission to actions on the API (can be specified with `resource` values `write` and `read`, default is `write`)
                 + `repository` - Gives permission to actions on a specific repository specified in the `resource`
                 + `repositories` -  Gives permission to actions on all repositories the user has access to, the `resource` is omitted
+                + `package` - Gives permission to publish and change owners of the package specified in the `resource`, and to all API reads
+                + `publish` - Gives permission to publish, revert, retire, and unretire releases, optionally only for the package specified in the `resource`
+                + `owners` - Gives permission to add and remove package owners, optionally only for the package specified in the `resource`
+                + `members` - Gives permission to manage organization members, the `resource` is omitted
+                + `administration` - Gives permission to change the number of seats of an organization, the `resource` is omitted
+                + `docs` - Gives permission to fetch private documentation of the organization specified in the `resource`
         + `resource` (string, optional)
     + `revoke_at` (string, optional) - If set, the ISO8601-encoded timestamp when the key will be automatically revoked
     + `last_use` (object, optional) - Information about the last time this key was used
@@ -1520,6 +1540,7 @@ Removes all API keys for the authenticated user.
             {
               "name": "my_computer",
               "authing_key": true,
+              "token_format": "v1",
               "permissions": [
                 {
                   "domain": "api",
@@ -1541,11 +1562,12 @@ Removes all API keys for the authenticated user.
 
 + Request
 
-    This request requires authentication.
+    This request requires an OAuth token from the Device Authorization Grant. The server refuses API tokens with `403 Forbidden`. A user with two-factor authentication must send the `x-hex-otp` header.
 
     + Header
 
-            Authorization: e2bfe5e65b9235acebe06df8027905c0
+            Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+            x-hex-otp: 123456
 
 + Response 200 (application/json)
 
@@ -1558,6 +1580,7 @@ Removes all API keys for the authenticated user.
             {
               "name": "my_computer",
               "authing_key": false,
+              "token_format": "v1",
               "permissions": [
                 {
                   "domain": "api",
@@ -1595,6 +1618,7 @@ Removes all API keys for the authenticated user.
             [{
               "name": "ci_server",
               "authing_key": false,
+              "token_format": "v1",
               "permissions": [
                 {
                   "domain": "repository",
@@ -1611,7 +1635,7 @@ Removes all API keys for the authenticated user.
 
 + Request
 
-    This request requires authentication.
+    This request requires an OAuth token from the Device Authorization Grant of a member of the organization. The server refuses API tokens with `403 Forbidden`. A user with two-factor authentication must send the `x-hex-otp` header. The role of the member limits which permissions the key can get.
 
     + Attributes
         + `name` (string, required)
@@ -1621,7 +1645,8 @@ Removes all API keys for the authenticated user.
     + Header
 
             Accept: application/json
-            Authorization: e2bfe5e65b9235acebe06df8027905c0
+            Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...
+            x-hex-otp: 123456
 
     + Body
 
@@ -1645,8 +1670,9 @@ Removes all API keys for the authenticated user.
 
             {
               "name": "ci_server",
-              "secret": "e2bfe5e65b9235acebe06df8027905c0",
+              "secret": "hex_e2bfe5e65b9235acebe06df8027905c09a3b1c2d",
               "authing_key": false,
+              "token_format": "v2",
               "permissions": [
                 {
                   "domain": "repository",
@@ -1697,7 +1723,7 @@ Creates a shortened URL.
 
 ### Verify Authentication [GET]
 
-Verifies that the provided authentication token is valid and has the required permissions.
+Verifies that the provided authentication token is valid and has the required permissions. The server answers `200 OK` with the key when the request authenticated with an API token, and `204 No Content` when it authenticated with an OAuth token.
 
 + Request
 
@@ -1707,6 +1733,36 @@ Verifies that the provided authentication token is valid and has the required pe
 
             Accept: application/json
             Authorization: e2bfe5e65b9235acebe06df8027905c0
+
++ Response 200 (application/json)
+
+    Returned when the request authenticated with an API token. The `x-hex-key-id` header has the ID of the key.
+
+    + Attributes
+        + `key` (object, required)
+            + `name` (string, required) - Key name
+            + `owner` (object, required)
+                + `type` (enum[string], required)
+                    + Members
+                        + `user`
+                        + `organization`
+                + `name` (string, required) - Username or organization name
+
+    + Header
+
+            x-hex-key-id: 1234
+
+    + Body
+
+            {
+              "key": {
+                "name": "ci_server",
+                "owner": {
+                  "type": "organization",
+                  "name": "acme"
+                }
+              }
+            }
 
 + Response 204
 
