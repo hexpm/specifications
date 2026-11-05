@@ -52,6 +52,8 @@ Command: `mix deps.get`
 
 Mix/Hex uses OAuth2 Device Authorization Grant ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)) for interactive authentication. `mix hex.user auth` requests the `api repositories` scopes, which include both read and write permissions; write operations additionally require 2FA to be enabled on the account and an OTP code in the `x-hex-otp` header. API keys can still be used directly, especially for CI environments; API keys cannot use 2FA. See [OAuth2 Device Authorization Grant](#6-oauth2-device-authorization-grant) for details.
 
+In a GitHub Actions job with the `id-token: write` permission, Mix fetches packages from an organization repository with Workload Identity when no organization key or signed-in user is configured. See [Workload Identity](#7-workload-identity).
+
 ### Cache Locations
 
 | Cache | Path | Contents |
@@ -196,7 +198,7 @@ Command: `rebar3 compile` (with hex plugin)
 
 ### Authentication
 
-Rebar3 uses basic authentication to generate API keys. Unlike Mix/Hex and Gleam, it does not support OAuth2 Device Authorization Grant.
+Rebar3 uses the OAuth2 Device Authorization Grant through `rebar3 hex user auth`, the same as Mix/Hex and Gleam. The API no longer accepts Basic authentication, so older Rebar3 versions that create keys with a password cannot authenticate.
 
 ### Cache Locations
 
@@ -369,11 +371,17 @@ Publishing requires write permissions:
 
 | Client | Authentication Method | 2FA Requirement |
 |--------|----------------------|-----------------|
-| Mix/Hex | OAuth token or API key | Required for OAuth tokens |
+| Mix/Hex | OAuth token, API key, or Workload Identity | Required for OAuth tokens |
 | Gleam | OAuth token or API key | Required for OAuth tokens |
-| Rebar3 | API key (via basic auth) | Not supported |
+| Rebar3 | OAuth token, API key, or Workload Identity | Required for OAuth tokens |
 
-For OAuth tokens, write operations prompt for a 2FA code which is sent via the `x-hex-otp` header.
+For OAuth tokens, write operations prompt for a 2FA code which is sent via the `x-hex-otp` header. In GitHub Actions, `mix hex.publish` and `rebar3 hex publish` exchange the job's OIDC token for a workload identity token when no other credential is configured. See [Workload Identity](#7-workload-identity).
+
+### Staged Publishing
+
+When a package uses staged publishing, the API holds releases and documentation from an API key, an organization key token, or a workload identity. It answers `201 Created` with a staged release instead of a release, and does not publish yet. A maintainer with 2FA compares the checksums and approves or rejects on the dashboard. Publishes by a person with an OAuth token and a 2FA code are not held.
+
+`mix hex.publish --wait` and `rebar3 hex publish --wait` open the approval page and poll the staged release URL from the `Location` header until it is approved, rejected, or expired. Mix binds the wait to the checksums that the API reported for the staged release, so a restaged release fails the wait.
 
 ### Sequence Diagram
 
@@ -442,8 +450,20 @@ sequenceDiagram
     Worker->>Worker: Gzip compress
     Worker->>S3: Upload registry files
 
-    API-->>Client: 201 Created
-    Client-->>Dev: ✓ Package published
+    alt Staged publishing applies
+        API->>API: Store staged release, do not publish
+        API-->>Client: 201 Created (staged release, Location: staged URL)
+        Client-->>Dev: Approval URL, expiry, checksums
+        opt --wait
+            loop Until approved, rejected, or expired
+                Client->>API: GET {staged URL}
+                API-->>Client: status
+            end
+        end
+    else Published directly
+        API-->>Client: 201 Created
+        Client-->>Dev: ✓ Package published
+    end
 
     Note over Dev: Optional: Publish docs
     Dev->>Client: mix hex.docs (automatic)
@@ -549,7 +569,7 @@ sequenceDiagram
 
 ## 6. OAuth2 Device Authorization Grant
 
-Mix/Hex and Gleam use [RFC 8628 OAuth2 Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628) for interactive authentication. This flow is designed for CLI tools that cannot easily handle browser redirects.
+Mix/Hex, Rebar3, and Gleam use [RFC 8628 OAuth2 Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628) for interactive authentication. This flow is designed for CLI tools that cannot easily handle browser redirects.
 
 ### Supported Clients
 
@@ -557,7 +577,7 @@ Mix/Hex and Gleam use [RFC 8628 OAuth2 Device Authorization Grant](https://datat
 |--------|--------------|----------|
 | Mix/Hex | Yes (default) | API keys via `HEX_API_KEY` |
 | Gleam | Yes (default) | API keys via `HEXPM_API_KEY` |
-| Rebar3 | No | Basic auth for API key generation |
+| Rebar3 | Yes (default) | API keys via `HEX_API_KEY` |
 
 ### OAuth Endpoints
 
@@ -566,6 +586,7 @@ Mix/Hex and Gleam use [RFC 8628 OAuth2 Device Authorization Grant](https://datat
 | `/api/oauth/device_authorization` | POST | Initiate device flow |
 | `/api/oauth/token` | POST | Exchange codes for tokens / refresh tokens |
 | `/api/oauth/revoke` | POST | Revoke tokens |
+| `/api/oauth/organization_authorization` | POST | Sign in to organizations that require single sign-on |
 
 ### Token Properties
 
@@ -573,7 +594,7 @@ Mix/Hex and Gleam use [RFC 8628 OAuth2 Device Authorization Grant](https://datat
 |----------|-------|
 | Access token lifetime | Short-lived (configurable) |
 | Refresh token lifetime | Long-lived |
-| Scopes requested by clients | `mix hex.user auth`: `api repositories` (full API + per-repository scopes). Gleam: `api:write`. |
+| Scopes requested by clients | `mix hex.user auth`: `api repositories` (full API + per-repository scopes). `rebar3 hex user auth`: `api:write`. Gleam: `api:write`. |
 | Write operations | Require 2FA via `x-hex-otp` header |
 
 ### Sequence Diagram
@@ -680,11 +701,75 @@ sequenceDiagram
 - Token storage: `~/.hex/hex.config`
 - Commands: `mix hex.user auth`, `mix hex.user deauth`
 
+#### Rebar3
+
+- Client ID: `b9721cf5-be2f-4a65-bfa5-141698b4b9cf`
+- Token storage: `~/.config/rebar3/hex.config`, under the `$oauth` key (`REBAR_GLOBAL_CONFIG_DIR` overrides the base directory)
+- Commands: `rebar3 hex user auth`, `rebar3 hex user deauth`
+
 #### Gleam
 
 - Client ID: `877731e8-cb88-45e1-9b84-9214de7da421`
 - Token storage: `~/.cache/gleam/hex/hexpm/credentials` (refresh token encrypted with user passphrase)
 - Command: `gleam hex authenticate`
+
+---
+
+## 7. Workload Identity
+
+A GitHub Actions job exchanges its OIDC token for a short-lived Hex token instead of using a stored API key. A full package owner, or an organization admin, configures the workload identity on hex.pm with 2FA. It names the GitHub owner, the repositories, the workflow file, and the environment.
+
+### Token Properties
+
+| Property | Value |
+|----------|-------|
+| OIDC audience | Configured in the client, `hexpm` by default. The client checks it against `GET /api/oidc/audience` and stops if they differ |
+| OIDC token reuse | Refused. Each OIDC token is exchanged at most once |
+| Scope | `package:REPOSITORY/PACKAGE` to publish one package, or `repository:ORGANIZATION` to fetch |
+| Lifetime | 15 minutes, no refresh token |
+| Write operations | Publish releases and documentation only. No revert, retire, owner, key, member, or setting changes |
+| Refused triggers | `pull_request_target`, `workflow_run` |
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Job as GitHub Actions Job
+    participant GH as GitHub OIDC Issuer
+    participant API as hex.pm API
+    participant CDN as repo.hex.pm
+
+    Job->>API: GET /api/oidc/audience
+    API-->>Job: {"audience": "hexpm"}
+    alt Reported audience differs from the configured audience
+        Job->>Job: Stop, do not request an OIDC token
+    end
+    Job->>GH: Request OIDC token (configured audience)
+    GH-->>Job: Signed JWT (repository, workflow, environment, sha, actor)
+
+    Job->>API: POST /api/oauth/token<br/>grant_type=jwt-bearer, assertion=JWT, scope=package:hexpm/PACKAGE
+    API->>API: Verify signature, audience, expiry, jti not used
+    API->>API: Refuse pull_request_target and workflow_run
+    API->>API: Match pinned owner and repository IDs, workflow, environment
+    alt Match
+        API-->>Job: access_token (15 minutes)
+    else No match
+        API-->>Job: 403 access_denied
+    end
+
+    Job->>API: POST /api/publish<br/>Authorization: Bearer {access_token}
+    API->>API: Record OIDC claims on the release
+    API-->>Job: 201 Created (release, or staged release)
+
+    opt Fetch private packages (scope=repository:ORG)
+        Job->>CDN: GET /repos/ORG/...<br/>Authorization: Bearer {access_token}
+        CDN->>CDN: Verify token at the edge
+        CDN-->>Job: Registry or tarball
+    end
+```
+
+repo.hex.pm verifies fetch tokens at the edge without hex.pm. A fetch token stays valid for up to 15 minutes after the workload identity is removed.
 
 ---
 

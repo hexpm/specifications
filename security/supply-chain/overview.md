@@ -48,7 +48,8 @@ flowchart LR
 | Audit logging | All publishing actions are logged | Implemented |
 | Owner notifications | All package owners are notified by email when a new version is published or when owners are added or removed | Implemented |
 | 2FA for publishing | OTP required for write operations via OAuth | Implemented |
-| Trusted publishing (OIDC) | Short-lived CI credentials | Planned |
+| Workload Identity (OIDC) | Short-lived CI credentials from GitHub Actions | Implemented |
+| Staged publishing | Human approval with 2FA for publishes from API keys and workload identities | Implemented |
 | Build provenance (SLSA) | Cryptographic proof of build origin | Planned |
 
 ### Distribution Side
@@ -74,8 +75,8 @@ flowchart LR
 | Stage | Threats | Current Mitigations |
 |-------|---------|---------------------|
 | Maintainer | Compromised credentials, malicious insider | 2FA, OAuth, audit logs |
-| Build | Compromised build environment | None (planned: trusted publishing, SLSA provenance) |
-| Publishing | Unauthorized publish, tampering | Authentication, authorization |
+| Build | Compromised build environment | Workload Identity binds publishes to a GitHub workflow, staged publishing (planned: SLSA provenance) |
+| Publishing | Unauthorized publish, tampering | Authentication, authorization, staged publishing |
 | Distribution | CDN/mirror tampering, MITM | Signed registry, checksums |
 | Consumption | Dependency confusion, typosquatting, vulnerable/retired versions | Repository field verification, typosquatting detection, advisory CLI reporting and dependency policies (Hex/Mix) |
 

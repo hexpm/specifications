@@ -95,6 +95,23 @@ Used by: `mix hex.publish`, `rebar3 hex publish`, `gleam publish`
 | API | `GET /packages/NAME` | Check if package exists |
 | API | `GET /users/me` | Get current user (for new packages) |
 | API | `PUT /packages/NAME/owners/USERNAME` | Add first owner (for new packages) |
+| API | `GET /packages/NAME/releases/VERSION/staged` | Poll a staged release until a person approves it |
+| API | `GET /packages/NAME/releases/VERSION/docs/staged` | Poll staged documentation until a person approves it |
+
+When staged publishing applies (see the Staged Publishing section of the HTTP API), the publish endpoints answer with a staged release instead of a release. The `Location` header has the URL to poll.
+
+### Publishing from CI with Workload Identity
+
+Used by: `mix hex.publish`, `rebar3 hex publish` in GitHub Actions
+
+| Type | Endpoint | Purpose |
+|------|----------|---------|
+| API | `GET /oidc/audience` | Check that the server expects the configured audience (`hexpm` by default) before requesting the GitHub Actions OIDC token |
+| API | `POST /oauth/token` | Exchange the OIDC token with the JWT Bearer Grant (`scope=package:REPOSITORY/PACKAGE`) |
+| API | `POST /publish` | Publish with `Authorization: Bearer TOKEN` |
+| API | `POST /oauth/revoke` | Revoke the token before it expires (optional) |
+
+To fetch from a private repository, exchange with `scope=repository:ORGANIZATION` and send the token to the repository endpoint.
 
 ### Package Retirement
 
@@ -102,6 +119,7 @@ Used by: `mix hex.retire`, `rebar3 hex retire`, `gleam retire`
 
 | Type | Endpoint | Purpose |
 |------|----------|---------|
+| API | `POST /packages/NAME/retire` | Retire all releases |
 | API | `POST /packages/NAME/releases/VERSION/retire` | Retire a release |
 | API | `DELETE /packages/NAME/releases/VERSION/retire` | Unretire a release |
 
@@ -118,7 +136,7 @@ Used by: `mix hex.owner`, `rebar3 hex owner`, `gleam owner`
 
 ### Authentication
 
-**OAuth2 Device Authorization** (used by: `mix hex.user auth`, `gleam authenticate`):
+**OAuth2 Device Authorization** (used by: `mix hex.user auth`, `rebar3 hex user auth`, `gleam authenticate`):
 
 | Type | Endpoint | Purpose |
 |------|----------|---------|
@@ -126,12 +144,15 @@ Used by: `mix hex.owner`, `rebar3 hex owner`, `gleam owner`
 | API | `POST /oauth/token` | Poll for token / refresh token |
 | API | `POST /oauth/revoke` | Revoke token |
 | API | `POST /oauth/revoke_by_hash` | Revoke token by hash |
+| API | `POST /oauth/organization_authorization` | Sign in to organizations that require single sign-on |
 
-**API Key Generation** (used by: `rebar3 hex user auth`):
+**API Key Exchange** (used by: `mix hex.organization auth`):
 
 | Type | Endpoint | Purpose |
 |------|----------|---------|
-| API | `POST /keys` | Create API key (with Basic Auth) |
+| API | `POST /oauth/token` | Exchange an organization API key for a short-lived token (`grant_type=client_credentials`) |
+
+The API does not accept Basic authentication.
 
 ### API Key Management
 
@@ -146,7 +167,7 @@ Used by: `mix hex.organization key`, `rebar3 hex user key`, `rebar3 hex organiza
 | API | `DELETE /keys` | Delete all keys |
 | API | `GET /auth` | Test key permissions |
 
-For organization keys, use `/orgs/ORG/keys` instead.
+For organization keys, use `/orgs/ORG/keys` instead. Creating and deleting keys requires an OAuth token from the Device Authorization Grant. The API refuses API keys for these requests.
 
 ### Package Information
 
@@ -180,11 +201,9 @@ Used by: `mix hex.docs`
 
 ### User Management
 
-Used by: `rebar3 hex user register`, `rebar3 hex user reset_password`
-
 | Type | Endpoint | Purpose |
 |------|----------|---------|
-| API | `POST /users` | Create new user account |
 | API | `GET /users/NAME` | Get user information |
 | API | `GET /users/me` | Get authenticated user |
-| API | `POST /users/NAME/reset` | Request password reset |
+
+Users register and reset passwords on the web interface. The API does not support these actions.

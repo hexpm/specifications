@@ -50,17 +50,17 @@ C4Context
     System_Ext(fastly, "Fastly CDN", "Global content delivery and edge compute")
     System_Ext(storage, "Cloud Storage", "Package artifacts and registry files")
 
-    System_Ext(github, "GitHub", "OAuth authentication and source code hosting")
+    System_Ext(github, "GitHub", "OAuth authentication, source code hosting, and Actions OIDC issuer")
     System_Ext(email, "Email Service", "Sends notifications and password resets")
 
     Rel(consumer, hex, "API requests", "HTTPS")
     Rel(consumer, fastly, "Repository requests", "HTTPS")
-    Rel(maintainer, hex, "Publishes packages", "HTTPS + API Key")
+    Rel(maintainer, hex, "Publishes packages", "HTTPS + OAuth, API Key, or Workload Identity")
     Rel(operator, hex, "Administers", "Internal")
 
     Rel(fastly, storage, "Serves registry + tarballs", "HTTPS cached")
 
-    Rel(hex, github, "OAuth authentication")
+    Rel(hex, github, "OAuth authentication, OIDC key and repository lookups")
     Rel(hex, email, "Sends notifications")
     Rel(hex, storage, "Stores packages")
 
@@ -74,7 +74,7 @@ C4Context
 - **Hex.pm Operators** - Maintain and operate the registry infrastructure
 
 **External Systems:**
-- **GitHub** provides OAuth authentication and hosts package source code
+- **GitHub** provides OAuth authentication, hosts package source code, and issues the OIDC tokens that GitHub Actions jobs exchange for workload identity tokens
 - **Email Service** sends password resets, ownership notifications, etc.
 - **Fastly CDN** caches and delivers registry files and package tarballs globally
 
@@ -273,6 +273,12 @@ C4Context
 - **Controls**: Signed registry, checksums, signature verification
 - **Critical**: Clients must NEVER send credentials to untrusted mirrors
 
+### Boundary 2a: CI Provider to Registry API
+
+- **Crosses**: GitHub Actions OIDC tokens, workload identity tokens
+- **Controls**: OIDC signature verification against GitHub's keys, audience check, single-use `jti`, refusal of privileged triggers, match against pinned GitHub IDs, workflow, and environment, 15 minute token lifetime, staged publishing
+- **Critical**: Hex.pm trusts GitHub to issue OIDC tokens only to the workflow runs that the claims describe
+
 ### Boundary 3: Internal Services
 
 - **Crosses**: Database connections, internal APIs
@@ -289,7 +295,8 @@ C4Context
 |------|----------|--------|----------------|-----------|
 | Client → Registry files | HTTPS | Protobuf + gzip | None (public) or API key (private) or OAuth2 (private) | RSA-PKCS1-SHA512 signatures |
 | Client → Tarballs | HTTPS | tar | None (public) or API key (private) or OAuth2 (private) | Checksums |
-| Client → API | HTTPS | JSON | API key (Bearer token) or OAuth | TLS |
+| Client → API | HTTPS | JSON | API key or OAuth access token (Bearer). OAuth access tokens come from the device code, client credentials, or JWT Bearer grant | TLS |
+| CI job → API (token exchange) | HTTPS | Form + JSON | GitHub Actions OIDC token as the JWT Bearer Grant assertion | TLS |
 | Browser → Web | HTTPS | HTML | Session cookie | TLS |
 | Browser → Docs | HTTPS | HTML | None | TLS + CSP |
 | hex.pm → PostgreSQL | TCP | PostgreSQL protocol | Connection credentials | - |
@@ -308,8 +315,13 @@ sequenceDiagram
     participant Worker as Registry Builder
     participant CDN as Fastly CDN
 
-    Client->>API: Publish package (Bearer: API key or OAuth access token; OAuth tokens additionally require x-hex-otp)
+    Client->>API: Publish package (Bearer: API key or OAuth access token, user OAuth tokens also require x-hex-otp)
     API->>API: Validate authentication & authorization
+    opt Staged publishing applies (API key, organization key token, or workload identity)
+        API->>DB: Store staged release
+        API-->>Client: 201 Created (staged release)
+        Note over API: A maintainer with 2FA approves on the dashboard, then the flow below continues
+    end
     API->>DB: Store package metadata
     API->>S3: Upload tarball
     API->>Worker: Trigger registry rebuild

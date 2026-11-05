@@ -18,33 +18,39 @@ Provenance answers:
 | Attribute | Tracked | Verifiable | Notes |
 |-----------|---------|------------|-------|
 | Publishing user | Yes | Via audit log | Account that initiated publish |
+| CI identity | Yes, for Workload Identity publishes | Via API (`oidc_claims`) | Verified GitHub repository, commit, workflow, ref, environment, run, and actor |
+| Approver | Yes, for staged releases | Via audit log | Person who approved the staged release |
 | Publish timestamp | Yes | Via API | Stored on the release record and exposed via the HTTP API; not part of the signed registry |
 | Publishing IP/client | Yes | Via audit log | Internal only |
-| Source repository | Yes | Metadata only | Maintainer-provided, not verified |
+| Source repository | Yes | Metadata only, or `oidc_claims` | Maintainer-provided and not verified, except the repository in `oidc_claims` |
 | Build environment | No | No | Planned with SLSA provenance |
 | Build commands | No | No | Planned with SLSA provenance |
 
-### Limitations
+### Workload Identity (OIDC)
 
-- No cryptographic proof of build origin
-- Source link is maintainer-provided metadata (not verified)
-- Build environment is not attested
-- No way to verify package was built from claimed source
-
-## Planned Improvements
-
-### Trusted Publishing (OIDC)
+Workload Identity, sometimes also known as Trusted Publishing, lets a GitHub Actions job publish without a stored API key. Hex.pm verifies the job's OIDC token, matches it against a workload identity that the package owners configured, and records the verified claims on the release. The release API exposes them as `oidc_claims`. The package page shows them in a Provenance card.
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| GitHub Actions | OIDC-based publishing from GitHub CI | Planned |
+| GitHub Actions | OIDC-based publishing from GitHub CI | Implemented |
 | GitLab CI | OIDC-based publishing from GitLab | Planned |
 | Other providers | Extensible OIDC provider support | Future |
 
 Benefits:
 - No long-lived secrets needed in CI
-- Verifiable link to source repository
+- Verified link to the source repository and commit
 - Repository-bound publishing authority
+
+The claims say which workflow run published the release. They do not prove what the workflow built. The record is in the hex.pm database and the API, and is not part of the signed registry.
+
+### Limitations
+
+- No cryptographic proof of build origin that clients can verify offline
+- Source link is maintainer-provided metadata (not verified), except for Workload Identity publishes
+- Build environment is not attested
+- No way to verify package was built from claimed source
+
+## Planned Improvements
 
 ### SLSA Build Provenance
 
@@ -82,7 +88,8 @@ All publication events will be recorded in an append-only transparency log:
 |-------------------|-------------|----------------------|
 | Manual (API key) | Low | Account only |
 | OAuth with 2FA | Medium | Account + 2FA |
-| Trusted Publishing | High | Account + CI identity + repository |
+| API key or Workload Identity with staged publishing | Medium | Credential + approval by a maintainer with 2FA |
+| Workload Identity | High | Package owner configuration + CI identity + repository |
 | SLSA Provenance | Highest | Full build chain verification |
 
 ## Consumer Guidance

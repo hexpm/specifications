@@ -54,7 +54,17 @@ Bearer tokens for API access.
 |-----------|-------------|
 | Location | Database (hashed), client machines (plaintext/encrypted) |
 | Impact if compromised | Unauthorized actions within token scope |
-| Protection | Scoping, revocation, short-lived OAuth tokens |
+| Protection | Scoping, revocation, short-lived OAuth and workload identity tokens, `hex_` prefix for secret scanning, staged publishing |
+
+### Workload Identity Configuration
+
+The GitHub owner, repositories, workflow, and environment that a package or organization trusts to publish or fetch.
+
+| Attribute | Description |
+|-----------|-------------|
+| Location | Database |
+| Impact if compromised | An attacker-controlled workflow can publish the covered packages or fetch private packages |
+| Protection | Full ownership or organization admin role with 2FA to change, pinned GitHub IDs, email notifications, audit log |
 
 ## High Value Assets
 
@@ -134,6 +144,7 @@ Impact ratings use [CVSS v4.0](https://www.first.org/cvss/v4.0/specification-doc
 | Registry Signing Key | High | High | High |
 | Maintainer Accounts | High | High | Low |
 | API Tokens | High | High | Low |
+| Workload Identity Configuration | Low | High | Low |
 | Documentation Content | None | Low | Low |
 | Package Ownership | Low | High | Low |
 | Organization Data | High | High | Low |

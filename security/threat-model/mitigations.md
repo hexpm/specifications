@@ -18,12 +18,14 @@ Addresses: [T1](threats.md#t1-malicious-package-publication), [T4](threats.md#t4
 | Email verification | Implemented | Users must verify email addresses for account recovery |
 | Password minimum length | Implemented | Minimum 8 characters, no complexity rules |
 | Leaked password detection | Implemented | Checks passwords against HaveIBeenPwned API on login and password change; warns users but allows login |
-| Two-factor authentication (TOTP) | Implemented | Optional for login, required for write operations with OAuth |
+| Two-factor authentication (TOTP) | Implemented | Optional for login. Required for write operations with OAuth, for adding, changing, or removing workload identities, and for approving staged releases |
 | Phishing-resistant 2FA (WebAuthn) | Planned | Hardware security keys and passkeys |
 | Passwordless authentication | Planned | Passkey-based access methods |
 | OAuth2 Device Authorization Grant | Implemented | Secure CLI authentication flow. See [Client Flows](client-flows.md#6-oauth2-device-authorization-grant) |
 | Login rate limiting | Implemented | 10 attempts per IP per 15 minutes |
-| Mandatory 2FA for maintainers | Planned | Requires rebar3 OAuth migration, then disable basic auth; 2FA already required for OAuth write operations |
+| Basic authentication removed | Implemented | The API refuses Basic authentication since 2026-11-01. Mix, Rebar3, and Gleam use the OAuth2 Device Authorization Grant |
+| Organization 2FA enforcement | Implemented | An organization can require 2FA for its members |
+| Mandatory 2FA for maintainers | Implemented | Every credential that can publish requires 2FA. OAuth write operations need an OTP code. The API and the dashboard refuse keys with `api`, `api:write`, `publish`, `publish:NAME`, or `package:NAME` permissions for an account without 2FA |
 | Critical package MFA | Partial | Require MFA for maintainers of high-impact packages |
 | Abandoned domain detection | Planned | Detect and disable account recovery via expired email domains |
 | Security notifications | Implemented | Alert maintainers about critical account changes via email |
@@ -33,13 +35,35 @@ Addresses: [T1](threats.md#t1-malicious-package-publication), [T4](threats.md#t4
 
 | Control | Status | Description |
 |---------|--------|-------------|
-| Scoped API tokens | Implemented | Tokens can be scoped by domain (api, repository, package, docs) and resource (read/write, specific repos/packages) |
+| Scoped API tokens | Implemented | Tokens can be scoped by domain (`api`, `package`, `publish`, `owners`, `members`, `administration`, `repository`, `repositories`, `docs`) and resource (read/write, specific repositories or packages). `publish:NAME` lets a CI key publish one package without the right to change owners |
 | Short-lived OAuth access tokens | Implemented | Access tokens expire quickly, refresh tokens for renewal |
 | Token revocation | Implemented | Users can revoke tokens at any time |
 | API key expiry dates | Implemented | Allow setting expiration on API keys |
-| Token prefixing | Planned | Distinctive repository identifiers on all tokens |
-| Secret scanning integration | Planned | Tokens compatible with third-party secret detection tools with automated revocation |
+| Token prefixing | Implemented | New API keys have a `hex_` prefix and a CRC32 checksum. Keys created before this format have no prefix |
+| Secret scanning integration | Implemented | Hex.pm is a GitHub Secret Scanning partner. When GitHub reports a leaked key in a public repository, Hex.pm revokes the key and emails its owner |
+| Keys cannot manage keys | Implemented | Only a signed-in person can create or revoke keys. A leaked key cannot create keys that outlive it or revoke the owner's other keys |
+| Revocation of exchanged tokens | Implemented | Revoking a key also revokes the short-lived tokens that were exchanged from it |
 | 2FA for write operations | Implemented | OAuth tokens require 2FA for publishing. See [Client Flows](client-flows.md#write-operations-with-2fa) |
+
+### Workload Identity
+
+Short-lived, scoped credentials for CI jobs in place of stored API keys. See [Client Flows](client-flows.md#7-workload-identity) and [Supply Chain - Provenance](../supply-chain/provenance.md).
+
+| Control | Status | Description |
+|---------|--------|-------------|
+| OIDC token exchange | Implemented | GitHub Actions only. A CI job exchanges a GitHub OIDC token for a Hex token with the JWT Bearer Grant |
+| Short-lived scoped tokens | Implemented | Tokens expire after 15 minutes. A publish token covers one package and cannot revert, retire, or change owners, keys, members, or settings |
+| Single-use OIDC tokens | Implemented | Each OIDC token is accepted once (`jti` replay check). OIDC tokens valid for more than 15 minutes are refused |
+| Immutable GitHub IDs | Implemented | The owner and repository IDs are pinned, so a deleted and re-created GitHub account or repository does not inherit a workload identity |
+| Environment required for public repositories | Implemented | A workload identity that names a public repository must name a GitHub environment, so GitHub protection rules apply before the job gets a token |
+| Privileged trigger refusal | Implemented | Tokens from `pull_request_target` and `workflow_run` events are refused, because a pull request from a fork can trigger them |
+| Client audience pinning | Partial | hex_core, which Mix and Rebar3 use, requests OIDC tokens only for a configured audience (`hexpm` by default). It stops when `GET /api/oidc/audience` reports a different value. Hand-written workflows that request a token for the reported audience do not have this protection |
+| Configuration requires full ownership and 2FA | Implemented | Full package owners, or organization admins for organization workload identities, configure them with 2FA enabled |
+| Configuration change notifications | Implemented | Package owners or organization admins are emailed when a workload identity is added, removed, or changed to trust more |
+| Removal on package transfer | Implemented | Transferring a package removes its package workload identities |
+| Token revocation on narrowing | Implemented | Removing a repository or changing the workflow or environment revokes the tokens the workload identity issued |
+| Exchange rate limits | Implemented | 1,000 exchanges per address per minute. Failed exchanges after verification count toward a limit per GitHub repository |
+| Additional CI providers | Planned | GitLab and other OIDC issuers are not supported |
 
 ### Session Security
 
@@ -61,6 +85,21 @@ Addresses: [T1](threats.md#t1-malicious-package-publication), [T2](threats.md#t2
 | Package ownership required | Implemented | Only owners can publish to a package |
 | Owner levels | Implemented | "full" (can manage owners) vs "maintainer" (can publish only) |
 | Transfer confirmation | Implemented | Ownership transfers require confirmation |
+
+### Staged Publishing
+
+Holds releases and documentation from automated credentials until a person approves them. See [Client Flows](client-flows.md#staged-publishing).
+
+| Control | Status | Description |
+|---------|--------|-------------|
+| Approval for automated publishes | Implemented | Releases and documentation published with an API key, an organization key token, or a workload identity are stored as staged releases. Publishes by a person with OAuth and a 2FA code are not held |
+| Default for new packages | Implemented | New packages require approval by default. Existing packages start with it off |
+| Organization requirement | Implemented | An organization can require staged publishing for every package in its private repository |
+| Approval requires 2FA | Implemented | A maintainer with 2FA approves or rejects on the dashboard after comparing the package and documentation checksums |
+| Expiry | Implemented | Staged releases expire after seven days |
+| Revert restriction | Implemented | API keys cannot revert releases or documentation of packages that use staged publishing |
+| Disable notification | Implemented | Turning staged publishing off requires 2FA and fresh verification, and emails full owners and owning organization admins |
+| Emergency publishing mode | Implemented | During an incident, operators can require approval for every public package publish from an API key, organization key token, or workload identity, whatever the package settings. Keys cannot revert public releases in this mode |
 
 ### Audit Trail
 
@@ -102,9 +141,9 @@ Addresses: [T3](threats.md#t3-package-tampering)
 
 | Control | Status | Description |
 |---------|--------|-------------|
-| Trusted Publishing (OIDC) | Planned | CI provider integration for keyless publishing |
+| Workload Identity (OIDC) | Partial | Keyless publishing from GitHub Actions. Other CI providers are not supported. See [Workload Identity](#workload-identity) |
 | Build attestations (SLSA) | Planned | Cryptographic proof of build origin |
-| Source repository linking | Partial | Links exist but not cryptographically verified |
+| Source repository linking | Partial | Releases published with a workload identity record the verified OIDC claims (repository, commit, workflow, actor) and expose them as `oidc_claims`. Other source links are maintainer-provided and not verified |
 
 See [Supply Chain - Provenance](../supply-chain/provenance.md).
 
@@ -303,13 +342,13 @@ Addresses: [T9](threats.md#t9-unmaintainedabandoned-packages)
 
 | Threat | Primary Mitigations | Status | Notes |
 |--------|---------------------|--------|-------|
-| T1: Malicious publication | 2FA, token scoping, audit logs | Implemented | 2FA optional for login |
+| T1: Malicious publication | 2FA, token scoping, staged publishing, audit logs | Implemented | 2FA optional for login. Staged publishing is off by default for existing packages |
 | T2: Typosquatting | Levenshtein check, community reports | Partial | Detection is alert-only |
 | T3: Package tampering | Signatures, checksums | Implemented | Strong coverage |
-| T4: Account takeover | 2FA, OAuth, leaked password check, rate limiting | Implemented | 2FA optional for login |
+| T4: Account takeover | 2FA, OAuth, leaked password check, secret scanning, rate limiting | Implemented | 2FA optional for login |
 | T5: Documentation attacks | Origin separation, CSP, sandboxing | Implemented | Strong coverage |
 | T6: Registry compromise | Access control, monitoring | Implemented | Strong coverage |
 | T7: DoS | Rate limiting, CDN | Implemented | Strong coverage |
 | T8: Vulnerable dependencies | OSV ingestion, advisory CLI reporting, dependency policies, CNA | Partial | Advisory consumption and policy enforcement in Hex (Elixir/Mix); not yet in Rebar3 or Gleam |
 | T9: Unmaintained packages | Metadata, retirement status | Partial | Succession process informal |
-| T10: Build pipeline compromise | (Planned: Trusted Publishing) | Planned | Gap - highest priority |
+| T10: Build pipeline compromise | Workload Identity, staged publishing | Partial | GitHub Actions only. No build attestations. A compromised workflow that matches a workload identity can still publish unless staged publishing applies |
