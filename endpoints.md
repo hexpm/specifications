@@ -96,6 +96,19 @@ Used by: `mix hex.publish`, `rebar3 hex publish`, `gleam publish`
 | API | `GET /users/me` | Get current user (for new packages) |
 | API | `PUT /packages/NAME/owners/USERNAME` | Add first owner (for new packages) |
 
+### Publishing from CI with Workload Identity
+
+Used by: `mix hex.publish`, `rebar3 hex publish` in GitHub Actions
+
+| Type | Endpoint | Purpose |
+|------|----------|---------|
+| API | `GET /oidc/audience` | Check that the server expects the configured audience (`hexpm` by default) before requesting the GitHub Actions OIDC token |
+| API | `POST /oauth/token` | Exchange the OIDC token with the JWT Bearer Grant (`scope=package:REPOSITORY/PACKAGE`) |
+| API | `POST /publish` | Publish with `Authorization: Bearer TOKEN` |
+| API | `POST /oauth/revoke` | Revoke the token before it expires (optional) |
+
+To fetch from a private repository, exchange with `scope=repository:ORGANIZATION` and send the token to the repository endpoint.
+
 ### Package Retirement
 
 Used by: `mix hex.retire`, `rebar3 hex retire`, `gleam retire`

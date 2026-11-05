@@ -74,7 +74,11 @@ Any endpoint implementation for Hex should support SSL termination by default, t
 $ curl -H "Authorization: Bearer token" https://hex.pm/api
 ```
 
-OAuth2 tokens are obtained via the [Device Authorization Grant (RFC 8628)](https://datatracker.ietf.org/doc/html/rfc8628). See the OAuth section below for details. OAuth2 tokens must be sent with the `Bearer` prefix in the `Authorization` header. OAuth tokens have read-only permissions by default; write operations require two-factor authentication via the `x-hex-otp` header.
+OAuth2 tokens must be sent with the `Bearer` prefix in the `Authorization` header. The OAuth token endpoint issues them from three grants. See the OAuth section below for details.
+
+  * The [Device Authorization Grant (RFC 8628)](https://datatracker.ietf.org/doc/html/rfc8628) issues a token for a person. These tokens have read-only permissions by default. Write operations require two-factor authentication via the `x-hex-otp` header.
+  * The Client Credentials Grant exchanges an API token for a short-lived token with the same permissions as the API token. This token cannot create or revoke API tokens. A token exchanged from the API token of a user requires the `x-hex-otp` header for write operations, the same as a Device Authorization Grant token.
+  * The [JWT Bearer Grant (RFC 7523)](https://www.rfc-editor.org/rfc/rfc7523) exchanges an OpenID Connect (OIDC) identity token from a CI provider for a short-lived token. See Workload Identity below.
 
 ##### API Token
 
@@ -87,6 +91,23 @@ API tokens are created via the web interface or the `/keys` endpoint. They provi
 ##### Basic Authentication (Removed)
 
 The server does not accept Basic authentication. A request with Basic credentials gets `401 Unauthorized` with a message that Basic authentication is disabled. Clients should use OAuth2 Device Authorization instead.
+
+### Workload Identity
+
+Workload Identity lets a CI job publish or fetch packages without a stored API token. Hex.pm supports GitHub Actions as the only CI provider.
+
+  1. A package owner, or an organization admin, configures a workload identity on the web interface. It names a GitHub repository owner, one or more repositories, a workflow file, and optionally a GitHub environment. The server pins the immutable GitHub IDs of the owner and of each repository.
+  2. The CI job requests an OIDC token from GitHub for the audience that the server expects. For Hex.pm, this audience is `hexpm`. Clients must use an audience they know in advance, not one that the server reports. See `GET /oidc/audience`.
+  3. The CI job exchanges the OIDC token at `POST /oauth/token` with the JWT Bearer Grant and a scope. `package:REPOSITORY/PACKAGE` names one package to publish. `repository:ORGANIZATION` fetches from the private repository of an organization.
+  4. The server verifies the OIDC token, finds a matching workload identity, and returns an access token. The access token expires after 15 minutes.
+
+A token with a package scope can only publish releases and documentation of that package, and read the staged releases of that package. It cannot revert or retire releases, or change owners, keys, members, or settings. A token with a repository scope can only fetch from the repository endpoint.
+
+The server accepts each OIDC token only once. It refuses OIDC tokens that are valid for more than 15 minutes. It refuses OIDC tokens from `pull_request_target` and `workflow_run` events, because a pull request from a fork can trigger these events. A workload identity that names a public GitHub repository must also name a GitHub environment.
+
+A workload identity cannot create a public package. An organization workload identity can create a package in the private repository of its organization.
+
+Releases that a workload identity publishes include the verified OIDC claims in the `oidc_claims` field of the release.
 
 ### Two-Factor Authentication (2FA)
 
@@ -918,6 +939,23 @@ Also available under /repos/{repository} for packages belonging to a specific re
         + `username` (string, required)
         + `email` (string, optional)
         + `url` (string, required)
+    + `oidc_claims` (object, optional) - Verified OIDC claims of the CI job that published this release with a workload identity. `null` if a workload identity did not publish the release. All values are strings copied from the GitHub Actions OIDC token.
+        + `repository` (string) - GitHub repository as `owner/name`
+        + `repository_id` (string) - Immutable GitHub repository ID
+        + `repository_owner` (string) - GitHub repository owner login
+        + `repository_owner_id` (string) - Immutable GitHub owner ID
+        + `workflow_ref` (string) - Workflow file and Git ref, for example `owner/name/.github/workflows/release.yml@refs/tags/v0.4.1`
+        + `job_workflow_ref` (string) - Workflow file and Git ref of the job, which is different from `workflow_ref` for a reusable workflow
+        + `environment` (string, optional) - GitHub Actions environment
+        + `sha` (string) - Git commit SHA
+        + `ref` (string) - Git ref
+        + `ref_type` (string) - `branch` or `tag`
+        + `run_id` (string) - GitHub Actions run ID
+        + `run_number` (string) - GitHub Actions run number
+        + `run_attempt` (string) - GitHub Actions run attempt
+        + `actor` (string) - GitHub login that triggered the workflow run
+        + `actor_id` (string) - Immutable GitHub ID of the actor
+        + `event_name` (string) - GitHub event that triggered the workflow run
     + `downloads` (number, required) - Number of downloads of the release
     + `inserted_at` (string, required) - ISO8601-encoded timestamp
     + `updated_at` (string, required) - ISO8601-encoded timestamp
@@ -992,6 +1030,7 @@ Also available under /repos/{repository} for packages belonging to a specific re
                 "email": "ericmj@mail.com",
                 "url": "https://hex.pm/api/users/ericmj"
               },
+              "oidc_claims": null,
               "downloads": 16,
               "security_advisories": [{
                 "id": "GHSA-xxxx-yyyy-zzzz",
@@ -1080,6 +1119,7 @@ Will also create a new package or update an existing one. See the package tarbal
                 "email": "ericmj@mail.com",
                 "url": "https://hex.pm/api/users/ericmj"
               },
+              "oidc_claims": null,
               "downloads": 0,
               "inserted_at": "2014-04-23T18:58:54Z",
               "updated_at": "2014-04-23T18:58:54Z"
@@ -1781,6 +1821,8 @@ Verifies that the provided authentication token is valid and has the required pe
 
 OAuth2 Device Authorization Grant ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)) enables CLI tools to authenticate users without requiring them to enter credentials directly into the terminal. Instead, users authenticate via a web browser.
 
+The OAuth endpoints read the client and the grant from the request body. They ignore a refused credential in the `Authorization` header.
+
 ## Device Authorization [/oauth/device_authorization]
 
 ### Initiate Device Authorization [POST]
@@ -1829,13 +1871,21 @@ Exchanges credentials for access and refresh tokens. Supports multiple grant typ
 
 **Refresh Token Grant** (`grant_type=refresh_token`): Exchanges a refresh token for a new access token.
 
+**Client Credentials Grant** (`grant_type=client_credentials`): Exchanges an API token, sent as `client_secret`, for a short-lived access token. The access token has the permissions of the API token, limited by `scope`. The response has no refresh token.
+
+**JWT Bearer Grant** (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`, [RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)): Exchanges a GitHub Actions OIDC token, sent as `assertion`, for a workload identity access token. No `client_id` is needed, because the OIDC token is the credential. `scope` is required and names one target: `package:REPOSITORY/PACKAGE` to publish one package, or `repository:ORGANIZATION` to fetch from the private repository of an organization. The access token expires after 900 seconds and has no refresh token. See the Workload Identity section in the introduction. The server answers `400` with `unsupported_grant_type` when the deployment disables Workload Identity.
+
 + Request (application/x-www-form-urlencoded)
 
     + Attributes
-        + `grant_type` (string, required) - Grant type: `urn:ietf:params:oauth:grant-type:device_code` or `refresh_token`
-        + `client_id` (string, required) - The OAuth client identifier
+        + `grant_type` (string, required) - Grant type: `urn:ietf:params:oauth:grant-type:device_code`, `refresh_token`, `client_credentials`, or `urn:ietf:params:oauth:grant-type:jwt-bearer`
+        + `client_id` (string, optional) - The OAuth client identifier. Required for all grants except the JWT Bearer Grant
         + `device_code` (string, optional) - Required for device_code grant
         + `refresh_token` (string, optional) - Required for refresh_token grant
+        + `client_secret` (string, optional) - Required for client_credentials grant. The API token to exchange
+        + `assertion` (string, optional) - Required for jwt-bearer grant. The OIDC token from the CI provider
+        + `scope` (string, optional) - Space-separated list of requested scopes. Required for jwt-bearer grant
+        + `name` (string, optional) - A descriptive name for the token, for the client_credentials grant
 
     + Body
 
@@ -1873,7 +1923,11 @@ Exchanges credentials for access and refresh tokens. Supports multiple grant typ
                 + `slow_down` - Client is polling too frequently, increase interval
                 + `access_denied` - User denied the authorization request
                 + `expired_token` - The device code has expired
-                + `invalid_grant` - Invalid or malformed device code or refresh token
+                + `invalid_grant` - Invalid or malformed device code, refresh token, or OIDC token, or an OIDC token that was already exchanged
+                + `invalid_request` - A required parameter is missing
+                + `invalid_scope` - The scope is missing or malformed
+                + `invalid_client` - The client or the API token is not valid
+                + `unsupported_grant_type` - The grant type is not supported
         + `error_description` (string, required) - Human-readable error description
 
     + Body
@@ -1881,6 +1935,28 @@ Exchanges credentials for access and refresh tokens. Supports multiple grant typ
             {
               "error": "authorization_pending",
               "error_description": "Authorization pending"
+            }
+
++ Response 403 (application/json)
+
+    Returned for the JWT Bearer Grant when no workload identity matches the OIDC token and the scope. The server gives the same answer for a package, repository, or organization that does not exist.
+
+    + Body
+
+            {
+              "error": "access_denied",
+              "error_description": "No matching workload identity"
+            }
+
++ Response 429 (application/json)
+
+    Returned for the JWT Bearer Grant when there were too many exchanges from the address, or too many failed exchanges for the GitHub repository. For the GitHub repository limit, `error` is `slow_down`.
+
+    + Body
+
+            {
+              "error": "slow_down",
+              "error_description": "Too many failed mint requests. Please try again later."
             }
 
 ## Token Revocation [/oauth/revoke]
@@ -1929,3 +2005,32 @@ Revokes a token using the refresh token hash. This allows revocation when the ac
     + Body
 
             {}
+
+# Group OIDC
+
+## OIDC Audience [/oidc/audience]
+
+### Fetch OIDC Audience [GET]
+
+Returns the audience that the server expects in OIDC tokens for the JWT Bearer Grant. The server answers `404 Not Found` when the deployment disables Workload Identity.
+
+Clients must not request an OIDC token for the audience that this endpoint returns. A CI provider issues a token for any audience that the job asks for. A server that is not Hex.pm could return the audience of another service, such as another package registry or a cloud provider. The client would then send that server a token that the other service accepts.
+
+Clients must use a configured audience, `hexpm` by default. Clients use this endpoint only to check that the server expects the same audience. If the values are different, the client must stop and not request an OIDC token.
+
++ Request
+
+    + Header
+
+            Accept: application/json
+
++ Response 200 (application/json)
+
+    + Attributes
+        + `audience` (string, required)
+
+    + Body
+
+            {
+              "audience": "hexpm"
+            }
