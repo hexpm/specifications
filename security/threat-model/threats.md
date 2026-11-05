@@ -16,6 +16,8 @@ An attacker publishes a package containing malicious code designed to harm users
 | Malicious maintainer | Insider threat from package owner | Supply chain attacks |
 | Compromised CI/CD | Attack on maintainer's build/publish pipeline | Supply chain attacks |
 | Social engineering | Convincing maintainer to add malicious contributor | Supply chain attacks |
+| Leaked automation credential | Publishing with a stolen API key or CI token without the maintainer's 2FA | Supply chain attacks |
+| Staging bypass via owner change | A key with `api:write`, `owners`, `package:NAME`, or `members` adds an owner or member, who then publishes with OAuth and 2FA without staged publishing | Supply chain attacks |
 
 ### Real-World Examples
 
@@ -45,7 +47,7 @@ An attacker publishes a package containing malicious code designed to harm users
 
 ### Related Controls
 
-See [Mitigations](./mitigations.md#identity--access) for controls.
+See [Mitigations](./mitigations.md#identity--access) for controls, and [Staged Publishing](./mitigations.md#staged-publishing) for approval of automated publishes.
 
 ## T2: Typosquatting / Dependency Confusion
 
@@ -160,6 +162,7 @@ An attacker gains unauthorized access to a maintainer or administrator account.
 | Credential reuse | Password from other breaches | Supply chain attacks |
 | Phishing | Fake login pages, OAuth consent abuse | Supply chain attacks |
 | Token leakage | API keys in logs, repos, screenshots | Supply chain attacks |
+| Key self-propagation | A leaked key creates new keys that outlive its revocation | Supply chain attacks |
 | Session hijacking | Cookie theft, XSS exploitation | Supply chain attacks |
 | Email domain expiry | Takeover of expired maintainer email domains | Supply chain attacks |
 
@@ -394,6 +397,11 @@ An attacker compromises the build or CI/CD pipeline of package maintainers, inje
 | Vector | Description |
 |--------|-------------|
 | CI/CD credential theft | Stealing publish tokens from CI systems |
+| Over-broad workload identity | A workload identity that trusts many repositories, every workflow, or no environment lets anyone who can push a workflow file to one of them publish |
+| Privileged workflow triggers | A `pull_request_target` or `workflow_run` workflow runs fork code with the base repository's OIDC permission |
+| OIDC audience confusion | A server at an untrusted API URL reports the audience of another service, such as another registry or a cloud provider. A client that requests an OIDC token for that audience gives the server a token that the other service accepts |
+| Stale workload identity | A removed owner or organization member keeps control of a GitHub workflow that a workload identity still trusts |
+| GitHub account or repository resurrection | An attacker re-creates a deleted GitHub owner or repository under the same name to inherit a workload identity |
 | Build system compromise | Modifying build scripts or dependencies |
 | Source repository attacks | Compromising GitHub/GitLab accounts |
 | IDE/toolchain attacks | Malicious IDE extensions or build tools |
@@ -425,7 +433,9 @@ An attacker compromises the build or CI/CD pipeline of package maintainers, inje
 
 ### Related Controls
 
-See [Build Provenance](./mitigations.md#build-provenance) under Supply Chain Integrity and [Supply Chain - Provenance](../supply-chain/provenance.md).
+See [Workload Identity](./mitigations.md#workload-identity), [Staged Publishing](./mitigations.md#staged-publishing), [Build Provenance](./mitigations.md#build-provenance) under Supply Chain Integrity, and [Supply Chain - Provenance](../supply-chain/provenance.md).
+
+Workload Identity removes long-lived publish keys from CI, but it moves trust to the GitHub workflow. Anyone who can run a workflow that matches a workload identity can publish the package. Staged publishing adds a human approval step after the CI job.
 
 ## Framework Cross-Reference
 

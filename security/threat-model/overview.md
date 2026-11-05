@@ -66,7 +66,7 @@ See [Threats](./threats.md) for detailed descriptions.
 
 Hex.pm is the distribution point, not the build system. This means:
 
-- **Limited control over T10**: Build happens on maintainer machines
+- **Limited control over T10**: Build happens on maintainer machines or in CI. Workload Identity binds CI publishes to a GitHub workflow, and staged publishing adds human approval, but Hex.pm cannot see inside the build
 - **Strong control over T3**: Registry signing and checksums provide tamper evidence
 - **Shared responsibility for T1/T4**: Authentication controls, but maintainers control their credentials
 
