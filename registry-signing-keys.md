@@ -1,8 +1,8 @@
 # Registry signing keys
 
-The registry is signed with one RSA key whose public half is compiled into Hex, rebar3 and Gleam. Replacing it requires a release of every client. This design adds a root key that clients trust. The root key signs a list of intermediate keys, an intermediate key signs a list of signing keys, and every registry file carries both lists. Once clients trust the root key, hex.pm replaces a signing key or an intermediate key by publishing a new list. The Fastly edge also signs a short-lived freshness header on every response, so a client can tell that a file is the one hex.pm serves at that time.
+The registry is signed with one RSA key whose public half is compiled into Hex, rebar3 and Gleam. Replacing it requires a release of every client. This design adds a root key that clients trust. The root key signs a list of intermediate keys, an intermediate key signs a list of signing keys, and every registry file carries both lists. Once clients trust the root key, hex.pm replaces a signing key or an intermediate key by publishing a new list. The `versions` file also gets an expiry, so a client can tell that the registry files it receives are current.
 
-The names `SignedKeys`, `IntermediateKeys`, `SigningKeys`, `Freshness`, `x-hex-freshness` and "key list" are proposals, and so is the one-hour validity of the freshness header.
+The names `SignedKeys`, `IntermediateKeys`, `SigningKeys`, "key list" and the `expires_at` field of `Versions` are proposals.
 
 ## How it works today
 
@@ -22,8 +22,6 @@ The root key is compiled into clients and signs only the intermediate key list. 
 The intermediate key signs only the signing key list. It's a Cloud KMS HSM key in a Google Cloud project of its own, which no service account of the hexpm projects can access. The root key can replace it without a client release.
 
 Signing keys sign registry files. hexpm holds their private halves. The intermediate key can replace them without a YubiKey.
-
-The freshness key signs the freshness header. The Fastly `repo` service holds it in its secret store. It's listed in the signing key list, so the intermediate key can replace it too.
 
 The intermediate key can't be exported, and neither can the root key once it's on the YubiKeys. Clients learn the intermediate and signing public keys from the two lists.
 
@@ -66,8 +64,6 @@ message SigningKeys {
   // Unix time in seconds after which clients reject the list
   required int64 expires_at = 2;
   repeated Key signing_keys = 3;
-  // Keys that sign the freshness header
-  repeated Key freshness_keys = 4;
 }
 
 message IntermediateKeys {
@@ -89,16 +85,6 @@ message Key {
   // Unix time in seconds when a KEY_RETIRING root key stops signing
   // lists. Shown in the client's warning, not enforced by clients.
   optional int64 retires_at = 4;
-}
-
-// Value of the x-hex-freshness response header, base64-encoded
-message Freshness {
-  // Unix time in seconds after which clients reject the response
-  required int64 expires_at = 1;
-  // SHA-256 of Signed.payload
-  required bytes payload_hash = 2;
-  // By a freshness key listed in the signing key list
-  required Signature signature = 3;
 }
 
 enum KeyAlgorithm {
@@ -125,7 +111,6 @@ Each tier signs with its own prefix, so a signature made for one purpose can't v
 - A signing key signs `"hex-registry-payload\n" || payload`.
 - An intermediate key signs `"hex-registry-signing-keys\n" || signing_keys.payload`.
 - A root key signs `"hex-registry-intermediate-keys\n" || intermediate_keys.payload`.
-- A freshness key signs `"hex-registry-freshness\n" || expires_at || payload_hash`, with `expires_at` as 8 bytes big-endian.
 
 A file can carry several signatures, one per signing key hexpm holds. This is how an algorithm change works: hexpm signs with a key of each algorithm and a client verifies the one it implements.
 
@@ -133,7 +118,7 @@ A file can carry several signatures, one per signing key hexpm holds. This is ho
 
 The enums are `optional` because protoc-generated proto2 parsers drop an unknown enum value, and a dropped `required` field fails the whole message. Value 0 of each enum is unspecified. A parser that substitutes the default for an absent or unknown value then skips the key or treats it as revoked.
 
-The two lists and the signatures add about 750 to 1,100 bytes to each registry file before gzip. That's an estimate from field sizes: 91-byte public keys, signatures of about 70 bytes, one root key, one or two intermediate keys, one or two signing keys, one freshness key, one root key signature, one intermediate key signature, and one or two file signatures.
+The two lists and the signatures add about 650 to 1,000 bytes to each registry file before gzip. That's an estimate from field sizes: 91-byte public keys, signatures of about 70 bytes, one root key, one or two intermediate keys, one or two signing keys, one root key signature, one intermediate key signature, and one or two file signatures.
 
 ## Client verification
 
@@ -163,22 +148,45 @@ Both lists are valid for 12 months and get re-signed every 6, the intermediate k
 
 ## Freshness
 
-The signatures above prove that hex.pm published a file. The freshness header proves that it's the file hex.pm serves now.
+The signatures above prove that hex.pm published a file. An expiry in `versions` proves that the file is current.
 
-The Fastly `repo` service adds `x-hex-freshness` to every `200` and `304` response for a registry file. Its value is a base64-encoded `Freshness` message: an expiry one hour ahead, the SHA-256 of the file's `Signed.payload`, and a signature by the freshness key. The service computes the payload hash when the file enters its cache and signs when it responds. The response's `Cache-Control: max-age` is no longer than the header's remaining validity, so a caching proxy fetches again before the header expires.
+`Versions` gets one field:
 
-For a repository whose selected signing key list has freshness keys, a client:
+```proto
+message Versions {
+  // All packages in the repository
+  repeated Package packages = 1;
+  // Name of repository
+  required string repository = 2;
+  // Unix time in seconds after which clients reject the file. A file
+  // without the field doesn't expire.
+  optional int64 expires_at = 3;
+}
+```
 
-1. Requires the header on every `200` and `304`.
-2. Verifies the signature under a freshness key that is `KEY_ACTIVE` in the selected signing key list.
-3. Rejects the response if `expires_at` has passed.
-4. Compares `payload_hash` with the hash of the payload it received, or on a `304` with the hash stored with its cached entry. On a mismatch after a `304` it drops the cached entry and fetches again without an ETag.
+hexpm sets `expires_at` to 7 days ahead on every build of `versions`. Every change to a package builds the file. A job builds the `versions` file of every repository again once the file is older than 24 hours.
 
-A repository whose signing key list has no freshness keys is verified without the header. The list is signed, so only the repository can turn the check off.
+`versions` lists the versions, the retired versions and the versions with advisories of every package. A client checks package files against it. For a repository configured with root keys, a client:
 
-The header says that Fastly served that payload at that time. A mirror or proxy can replay a response for at most an hour. A stale copy inside Fastly or in the bucket gets a current header, so the check doesn't cover those. Whoever holds the freshness key can make an old file pass as current for as long as they hold it, and can't change a file's content.
+1. Fetches `versions` once per command, before it uses a fetched or cached `packages/NAME` file.
+2. Rejects `versions` if its `expires_at` has passed.
+3. Compares the package file with its entry in `versions`. The versions, the retired versions and the versions with advisories must be equal.
+4. On a mismatch, fetches both files again without ETags, one time. A publish writes the two files one after the other, so a client can see them out of step for a moment. A second mismatch is an error.
 
-Hex keeps using cached entries when the repository is unreachable, as today. A client whose clock is more than an hour ahead rejects every response. A mirror that copies registry files into its own storage has no header to serve, so upgraded clients reject it for repositories that have freshness keys.
+A `versions` file without `expires_at` doesn't expire, and the client still does step 3. Registries built with `mix hex.registry build` have no job that rebuilds them, so their files stay without the field. hex.pm sets the field from the first file that a new signing key signs, so no file without the field verifies for hex.pm.
+
+The check has these limits:
+
+- A mirror or proxy can replay an old state of the registry for 7 days at most.
+- A change to a package file that leaves the three lists equal isn't detected. An example is a changed retirement message.
+- `names` and `policies/NAME` aren't covered.
+- A client whose clock is ahead of the expiry rejects the file.
+
+Hex keeps using cached entries when the repository is unreachable, as today, also when its cached `versions` has expired.
+
+A mirror serves `versions` as a normal file. It has to sync `versions` and the package files before the expiry, which is at least 6 days away. A caching proxy has to fetch `versions` again before the expiry.
+
+The client fetches `versions` for every command that reads a package file. The size of that file for hex.pm and the cost of the fetch haven't been measured.
 
 ## Replacing keys later
 
@@ -192,8 +200,6 @@ A compromised key goes through the same three steps. A list that revoked the old
 
 The intermediate key is replaced the same way one tier up. The root key signs an intermediate key list with both intermediate keys active, and the new intermediate key signs a signing key list. After the rebuild, the root key signs an intermediate key list that revokes the old intermediate key. Clients then drop every signing key list the old intermediate key signed.
 
-The freshness key is replaced with the same three steps as a signing key. The Fastly service switches to the new key after the rebuild in step 2, when every file carries a list that names it.
-
 Clients with stored state need no release for either. Clients without stored state stop accepting the old key when the previous list expires or when they're upgraded to a release with a raised minimum version.
 
 If both YubiKeys are lost, nothing can sign the next intermediate key list, and every client needs a release with a new root key before the last list expires. A compromised root key also requires a release of every client with a new root key.
@@ -202,15 +208,15 @@ If both YubiKeys are lost, nothing can sign the next intermediate key list, and 
 
 ### specifications
 
-`registry/signed.proto` changes as above and `registry-v2.md` gets the verification steps and the freshness header. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements".
+`registry/signed.proto` and `registry/versions.proto` change as above and `registry-v2.md` gets the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements".
 
 ### hex_core
 
-`hex_pb_signed` is regenerated. `hex_registry` signs with a list of signing keys plus the two `SignedKeys` binaries, builds and signs both lists, and verifies as above. `hex_core:default_config/0` replaces `repo_public_key` for hex.pm with the root public keys. Custom repositories are configured with root public keys or with `repo_public_key`. `hex_repo` passes the `x-hex-freshness` header to the verification.
+`hex_pb_signed` is regenerated. `hex_registry` signs with a list of signing keys plus the two `SignedKeys` binaries, builds and signs both lists, and verifies as above. `hex_core:default_config/0` replaces `repo_public_key` for hex.pm with the root public keys. Custom repositories are configured with root public keys or with `repo_public_key`. `hex_pb_versions` is regenerated, and `hex_registry` gets the check of a package file against `versions`.
 
 ### hex
 
-Hex vendors the new hex_core, and `Hex.Repo` replaces `@hexpm_public_key` with the root keys. `Hex.Registry.Server` stores the lists, drops cached entries as described under client verification, and prints the retiring warning. It stores the payload hash of each cached entry for the freshness check on a `304`. It also gets error messages for an expired list, a revoked key and a missing or expired freshness header. `mix hex.repo add` and `mix hex.repo set` get `--root-key PATH`, which configures the repository with a root public key and can be given more than once. `mix hex.registry build` doesn't change.
+Hex vendors the new hex_core, and `Hex.Repo` replaces `@hexpm_public_key` with the root keys. `Hex.Registry.Server` stores the lists, drops cached entries as described under client verification, and prints the retiring warning. It fetches `versions` once per command and runs the freshness check. It also gets error messages for an expired list, a revoked key, an expired `versions` file and a package file that doesn't match `versions`. `mix hex.repo add` and `mix hex.repo set` get `--root-key PATH`, which configures the repository with a root public key and can be given more than once. `mix hex.registry build` doesn't change.
 
 ### hexpm
 
@@ -218,22 +224,24 @@ Hex vendors the new hex_core, and `Hex.Repo` replaces `@hexpm_public_key` with t
 
 At boot hexpm checks that the intermediate key list verifies against the configured root public keys, that the signing key list verifies against the intermediate key list, and that it lists every configured signing key as active. It refuses to start otherwise. An expired list raises the alert and hexpm keeps running.
 
+hexpm sets `expires_at` on every build of `versions`. A job builds the `versions` file of every repository again once the file is older than 24 hours.
+
 A job rebuilds every registry file and policy of every repository and purges the CDN. The public keys page lists the root keys and the revoked RSA key. `diff`, `preview` and `hexdocs` get the new hex_core.
 
 ### hexpm-ops
 
-The new signing key gets its own Secret Manager secret, pinned next to `HEXPM_SIGNING_KEY` in `secret-versions.json` and added to `SIGNING_KEYS` in `bin/secret-recovery`. The signed lists aren't secret, so they're plain configuration per environment. Terraform creates the Google Cloud project and the KMS key for the intermediate key. One script signs a signing key list with the KMS key, another signs an intermediate key list with a YubiKey, and both verify the result. An alert fires 90 days before either list expires. The Fastly `repo` service gets the freshness key in its secret store. It computes the payload hash when a registry file enters its cache and adds the header to `200` and `304` responses, with `max-age` capped at the header's remaining validity. Staging gets its own root key, intermediate key, signing key and freshness key, and every step runs there first.
+The new signing key gets its own Secret Manager secret, pinned next to `HEXPM_SIGNING_KEY` in `secret-versions.json` and added to `SIGNING_KEYS` in `bin/secret-recovery`. The signed lists aren't secret, so they're plain configuration per environment. Terraform creates the Google Cloud project and the KMS key for the intermediate key. One script signs a signing key list with the KMS key, another signs an intermediate key list with a YubiKey, and both verify the result. An alert fires 90 days before either list expires, and another when a `versions` file has less than 5 days left. Staging gets its own root key, intermediate key and signing key, and every step runs there first.
 
 ### Outside the hexpm organization
 
-rebar3 vendors the new hex_core. Gleam needs the format and the freshness check in `gleam-lang/hexpm-rust` and the root keys in the compiler. Proxies have to pass the `x-hex-freshness` header through and honor `max-age`. Proxies that verify hex.pm's signature with the old key need the new format before the cutoff. Artifactory and Cloudsmith may be among them; that hasn't been checked. Mirrors that serve current files unchanged need no changes.
+rebar3 vendors the new hex_core. Gleam needs the format and the freshness check in `gleam-lang/hexpm-rust` and the root keys in the compiler. Proxies that verify hex.pm's signature with the old key need the new format before the cutoff. Artifactory and Cloudsmith may be among them; that hasn't been checked. Mirrors that serve current files unchanged need no changes, if they sync before `versions` expires. Caching proxies have to fetch `versions` again before it expires.
 
 ## This rotation
 
-1. Generate the root key and import it into both YubiKeys. Generate the intermediate key, the new signing key and the freshness key. Sign intermediate key list version 1 with the root key and signing key list version 1 with the intermediate key.
+1. Generate the root key and import it into both YubiKeys. Generate the intermediate key and the new signing key. Sign intermediate key list version 1 with the root key and signing key list version 1 with the intermediate key.
 2. Merge the specification and release hex_core with the root public keys.
-3. Deploy hexpm so every file carries fields 3, 4 and 5, with field 2 still signed by the old RSA key. Deploy the Fastly `repo` service so responses carry the freshness header. Run the rebuild job and confirm the CDN serves the new files. Released clients keep working because they read only field 2.
-4. Release Hex, rebar3 and Gleam with the root keys, and bump hex_core in `diff`, `preview` and `hexdocs`. These require fields 4 and 5 and the freshness header, so none of them ships before step 3 is confirmed. From their release on, upgraded clients reject files signed only with the old key.
+3. Deploy hexpm so every file carries fields 3, 4 and 5, with field 2 still signed by the old RSA key, and `versions` carries `expires_at`. Run the rebuild job and confirm the CDN serves the new files. Released clients keep working because they read only field 2.
+4. Release Hex, rebar3 and Gleam with the root keys, and bump hex_core in `diff`, `preview` and `hexdocs`. These require fields 4 and 5 and check `versions`, so none of them ships before step 3 is confirmed. From their release on, upgraded clients reject files signed only with the old key.
 5. Announce a cutoff date in the incident blog post and the user email.
 6. At the cutoff, deploy hexpm without the old key and run the rebuild job. After no SecretSync resource, Pod or Job template references `hexpm-signing-key` version 1, destroy that version. Field 2 is then 256 zero bytes, which released clients reject through their ordinary bad-signature path. An absent field 2 would crash released hex_core on a failed map match in `decode_and_verify_signed/2`.
 
