@@ -1,6 +1,6 @@
 # Registry signing keys
 
-The registry is signed with one RSA key whose public half is compiled into Hex, rebar3 and Gleam. Replacing it requires a release of every client. This design adds a root key that clients trust. The root key signs a list of intermediate keys, and an intermediate key signs a list of signing keys. The repository serves both lists as files next to the registry files. Once clients trust the root key, hex.pm replaces a signing key or an intermediate key by publishing a new list. A root key can also hand trust to a new root key, so a planned root roll needs no client release. The `versions` file also gets an expiry, so a client can tell that the registry files it receives are current.
+The registry is signed with one RSA key whose public half is compiled into Hex, rebar3 and Gleam. Replacing it requires a release of every client. This design adds root keys that clients trust. A root key signs a list of intermediate keys, and an intermediate key signs a list of signing keys. The repository serves both lists as files next to the registry files. Once clients trust the root keys, hex.pm replaces a signing key or an intermediate key by publishing a new list. A root key can also hand trust to a new root key, so a planned root roll needs no client release. The `versions` file also gets an expiry, so a client can tell that the registry files it receives are current.
 
 The names `SignedKeys`, `IntermediateKeys`, `SigningKeys` and "key list", the paths `keys/intermediate` and `keys/signing`, and the `expires_at` field of `Versions` are proposals.
 
@@ -17,13 +17,13 @@ The names `SignedKeys`, `IntermediateKeys`, `SigningKeys` and "key list", the pa
 
 There are three tiers.
 
-The root key is compiled into clients and signs only the intermediate key list. It's generated once on an offline machine and imported into a PIV slot on each of two YubiKey 5s, and the copy on the machine is destroyed. Losing one YubiKey leaves the other. The YubiKeys are offline except when a list is signed. The format allows several root keys, which a root roll uses.
+The root keys are compiled into clients and sign only the intermediate key list. There are two root keys. Each one is generated on its own YubiKey 5 in a PIV slot and never leaves it. PIV attestation proves that the key was generated on the device. A different person holds each YubiKey, and the YubiKeys are offline except when a list is signed. One root signature is enough for a list, so losing one YubiKey leaves the other. The remaining root key then signs a list that adds a replacement root key.
 
-The intermediate key signs only the signing key list. It's a Cloud KMS HSM key in a Google Cloud project of its own, which no service account of the hexpm projects can access. The root key can replace it without a client release.
+The intermediate key signs only the signing key list. It's a Cloud KMS HSM key in a Google Cloud project of its own, which no service account of the hexpm projects can access. A root key can replace it without a client release.
 
 Signing keys sign registry files. hexpm holds their private halves. The intermediate key can replace them without a YubiKey.
 
-The intermediate key can't be exported, and neither can the root key once it's on the YubiKeys. Clients learn the intermediate and signing public keys from the two lists.
+The intermediate key and the root keys can't be exported. Clients learn the intermediate and signing public keys from the two lists.
 
 All new keys are ECDSA P-256 with SHA-256. OTP's `public_key`, ring (which Gleam uses), Cloud KMS and YubiKey PIV support it, and a signature is about 70 bytes where RSA 2048 needs 256. Each key names its algorithm, so a later key can use a different one.
 
@@ -267,7 +267,7 @@ A root key is replaced through the chain. A root key signs an intermediate key l
 
 No client needs a release for any of these. [What a revocation reaches](#what-a-revocation-reaches) gives the limits for clients without stored state.
 
-If both YubiKeys are lost, nothing can sign the next intermediate key list, and every client needs a release with new root keys before the last list expires. A compromised root key also requires a release of every client with new root keys.
+If one YubiKey is lost, the other root key signs a list that revokes the lost key and adds a replacement. If both YubiKeys are lost at the same time, nothing can sign the next intermediate key list, and every client needs a release with new root keys before the last list expires. A compromised root key also requires a release of every client with new root keys.
 
 ## Changes per repository
 
@@ -295,7 +295,7 @@ A job rebuilds every registry file and policy of every repository and purges the
 
 ### hexpm-ops
 
-The new signing key gets its own Secret Manager secret, pinned next to `HEXPM_SIGNING_KEY` in `secret-versions.json` and added to `SIGNING_KEYS` in `bin/secret-recovery`. Terraform creates the Google Cloud project and the KMS key for the intermediate key, and the scheduled job in that project that re-signs the signing key list. That job can write only the `keys/signing` object of the repository bucket. One script signs a changed signing key list with the KMS key, another signs an intermediate key list with a YubiKey. Both verify the result, upload it and purge the CDN. An alert fires when the signing key list has less than 14 days left, when the intermediate key list has less than 90 days left, or when a `versions` file has less than 5 days left. Staging gets its own root key, intermediate key and signing key, and every step runs there first.
+The new signing key gets its own Secret Manager secret, pinned next to `HEXPM_SIGNING_KEY` in `secret-versions.json` and added to `SIGNING_KEYS` in `bin/secret-recovery`. Terraform creates the Google Cloud project and the KMS key for the intermediate key, and the scheduled job in that project that re-signs the signing key list. That job can write only the `keys/signing` object of the repository bucket. One script signs a changed signing key list with the KMS key, another signs an intermediate key list with a YubiKey. Both verify the result, upload it and purge the CDN. An alert fires when the signing key list has less than 14 days left, when the intermediate key list has less than 90 days left, or when a `versions` file has less than 5 days left. Staging gets its own root keys, intermediate key and signing key, and every step runs there first.
 
 ### Outside the hexpm organization
 
@@ -303,7 +303,7 @@ rebar3 vendors the new hex_core. Gleam needs the format, the key list update and
 
 ## This rotation
 
-1. Generate the root key and import it into both YubiKeys. Generate the intermediate key and the new signing key. Sign intermediate key list version 1 with the root key and signing key list version 1 with the intermediate key.
+1. Generate a root key on each YubiKey. Generate the intermediate key and the new signing key. Sign intermediate key list version 1 with a root key and signing key list version 1 with the intermediate key.
 2. Merge the specification and release hex_core with the root public keys.
 3. Publish the key list files. Deploy hexpm so every file carries field 3, with field 2 still signed by the old RSA key, and `versions` carries `expires_at`. Run the rebuild job and confirm the CDN serves the new files and the key list files. Released clients keep working because they read only field 2.
 4. Release Hex, rebar3 and Gleam with the root keys, and bump hex_core in `diff`, `preview` and `hexdocs`. These require field 3 and the key list files and check `versions`, so none of them ships before step 3 is confirmed. From their release on, upgraded clients reject files signed only with the old key.
