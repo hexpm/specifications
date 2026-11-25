@@ -359,6 +359,13 @@ follow_root_key_chain(known, newest, trusted):
 
 The client doesn't check `expires_at` of a step, because every list before the newest one is expected to be expired. It doesn't store a step. Only the newest list is stored, after it passes `newest_intermediate_list`.
 
+The direct check of the newest list and the chain accept the same lists:
+
+- A list from hex.pm that passes the direct check also passes the chain, because every list has a signature by a root key that is usable in the version before it.
+- Someone who holds a root key that was usable at version N can pass the direct check of a client at version N. That person can also forge every step of the chain from N.
+
+The direct check therefore saves fetches and doesn't change what a client accepts. After either path the client stores only the newest list, so its trusted root keys are the usable root keys of that list. The stored state of a client doesn't change the result.
+
 A planned root roll therefore needs no client release, and a client of any age can reach the current root keys. The limit is a compromised root key. Someone who holds a root key that was usable at version N can forge a chain for every client whose known version is N or lower. Such clients need a release with new root keys and a higher `root_version`.
 
 ### Errors and warnings
