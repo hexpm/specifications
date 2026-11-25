@@ -21,9 +21,9 @@ The root keys are compiled into clients and sign only the intermediate key list.
 
 The intermediate key signs only the signing key list. It's a Cloud KMS HSM key in a Google Cloud project of its own, which no service account of the hexpm projects can access. A root key can replace it without a client release.
 
-Signing keys sign registry files. hexpm holds their private halves. The intermediate key can replace them without a YubiKey.
+Signing keys sign registry files. A signing key is a Cloud KMS key in the hexpm project, and hexpm signs through the KMS API. The hexpm service account can sign with the key and can't export it. Someone who takes over hexpm can sign files only while they have access, and the KMS audit log records each signature. The intermediate key can replace a signing key without a YubiKey.
 
-The intermediate key and the root keys can't be exported. Clients learn the intermediate and signing public keys from the two lists.
+No private key of any tier can be exported. Clients learn the intermediate and signing public keys from the two lists.
 
 All new keys are ECDSA P-256 with SHA-256. OTP's `public_key`, ring (which Gleam uses), Cloud KMS and YubiKey PIV support it, and a signature is about 70 bytes where RSA 2048 needs 256. Each key names its algorithm, so a later key can use a different one.
 
@@ -255,7 +255,7 @@ The client fetches `versions` for every command that reads a package file. The s
 
 A signing key is replaced with the intermediate key:
 
-1. Generate the new signing key. Sign and publish a signing key list that has both signing keys active.
+1. Create the new signing key in KMS. Sign and publish a signing key list that has both signing keys active.
 2. Deploy hexpm so it signs with both keys. Rebuild every registry file and policy and purge the CDN.
 3. Sign and publish a signing key list that marks the old key `KEY_REVOKED`. Deploy hexpm so it signs with the new key only.
 
@@ -277,7 +277,7 @@ If one YubiKey is lost, the other root key signs a list that revokes the lost ke
 
 ### hex_core
 
-`hex_pb_signed` is regenerated. `hex_registry` signs with a list of signing keys. It builds and signs both lists and verifies as above. `hex_repo` fetches the key list files. `hex_core:default_config/0` replaces `repo_public_key` for hex.pm with the root public keys and their list version. Custom repositories are configured with root public keys or with `repo_public_key`. `hex_pb_versions` is regenerated, and `hex_registry` gets the check of a package file against `versions`.
+`hex_pb_signed` is regenerated. `hex_registry` signs with a list of signing keys, where a key is a private key or a function that signs. It builds and signs both lists and verifies as above. `hex_repo` fetches the key list files. `hex_core:default_config/0` replaces `repo_public_key` for hex.pm with the root public keys and their list version. Custom repositories are configured with root public keys or with `repo_public_key`. `hex_pb_versions` is regenerated, and `hex_registry` gets the check of a package file against `versions`.
 
 ### hex
 
@@ -285,7 +285,7 @@ Hex vendors the new hex_core, and `Hex.Repo` replaces `@hexpm_public_key` with t
 
 ### hexpm
 
-`Storage.sign_and_gzip/1` signs with the configured signing keys, and fills field 2 from the old RSA key while one is configured. `HEXPM_SIGNING_KEY` becomes optional in `config/runtime.exs`.
+`Storage.sign_and_gzip/1` signs through KMS with the configured signing keys, and fills field 2 from the old RSA key while one is configured. `HEXPM_SIGNING_KEY` becomes optional in `config/runtime.exs`. Development and test environments sign with a local key. A publish signs three files and a full rebuild signs every file. The latency per publish and the KMS quota for a rebuild haven't been measured.
 
 At boot hexpm fetches both lists and checks that the signing key list verifies against the configured root public keys and lists every configured signing key as active. It refuses to start otherwise.
 
@@ -295,7 +295,7 @@ A job rebuilds every registry file and policy of every repository and purges the
 
 ### hexpm-ops
 
-The new signing key gets its own Secret Manager secret, pinned next to `HEXPM_SIGNING_KEY` in `secret-versions.json` and added to `SIGNING_KEYS` in `bin/secret-recovery`. Terraform creates the Google Cloud project and the KMS key for the intermediate key, and the scheduled job in that project that re-signs the signing key list. That job can write only the `keys/signing` object of the repository bucket. One script signs a changed signing key list with the KMS key, another signs an intermediate key list with a YubiKey. Both verify the result, upload it and purge the CDN. An alert fires when the signing key list has less than 14 days left, when the intermediate key list has less than 90 days left, or when a `versions` file has less than 5 days left. Staging gets its own root keys, intermediate key and signing key, and every step runs there first.
+Terraform creates the signing key in KMS, with permission to sign for the hexpm service account and with data access audit logs. Terraform also creates the Google Cloud project and the KMS key for the intermediate key, and the scheduled job in that project that re-signs the signing key list. That job can write only the `keys/signing` object of the repository bucket. One script signs a changed signing key list with the KMS key, another signs an intermediate key list with a YubiKey. Both verify the result, upload it and purge the CDN. An alert fires when the signing key list has less than 14 days left, when the intermediate key list has less than 90 days left, or when a `versions` file has less than 5 days left. Staging gets its own root keys, intermediate key and signing key, and every step runs there first.
 
 ### Outside the hexpm organization
 
@@ -303,7 +303,7 @@ rebar3 vendors the new hex_core. Gleam needs the format, the key list update and
 
 ## This rotation
 
-1. Generate a root key on each YubiKey. Generate the intermediate key and the new signing key. Sign intermediate key list version 1 with a root key and signing key list version 1 with the intermediate key.
+1. Generate a root key on each YubiKey. Create the intermediate key and the new signing key in KMS. Sign intermediate key list version 1 with a root key and signing key list version 1 with the intermediate key.
 2. Merge the specification and release hex_core with the root public keys.
 3. Publish the key list files. Deploy hexpm so every file carries field 3, with field 2 still signed by the old RSA key, and `versions` carries `expires_at`. Run the rebuild job and confirm the CDN serves the new files and the key list files. Released clients keep working because they read only field 2.
 4. Release Hex, rebar3 and Gleam with the root keys, and bump hex_core in `diff`, `preview` and `hexdocs`. These require field 3 and the key list files and check `versions`, so none of them ships before step 3 is confirmed. From their release on, upgraded clients reject files signed only with the old key.
