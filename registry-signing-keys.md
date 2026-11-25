@@ -25,7 +25,7 @@ The document has these parts:
 
 - `Signed` in `registry/signed.proto` has `payload` (1) and `signature` (2). The signature is RSA PKCS#1 v1.5 with SHA-512 over `payload`.
 - hexpm signs in `Hexpm.Repository.Storage.sign_and_gzip/1` with `HEXPM_SIGNING_KEY`, for `names`, `versions`, `packages/NAME` and `policies/NAME` of the `hexpm` repository and of every organization repository.
-- hex_core verifies in `hex_registry:decode_and_verify_signed/2` with `repo_public_key`, which defaults to the key compiled into `hex_core.erl`. Hex compiles in its own copy in `Hex.Repo`. rebar3 vendors hex_core 0.20.1 with the key. Gleam compiles the key into `compiler-core/src/hex.rs` and verifies in `gleam-lang/hexpm-rust`.
+- hex_core verifies in `hex_registry:decode_and_verify_signed/2` with `repo_public_key`, which defaults to the key compiled into `hex_core.erl`. Hex compiles in its own copy in `Hex.Repo`. rebar3 vendors hex_core 0.20.1 with the key. Gleam compiles the key into `compiler-core/src/hex.rs` and verifies in the `hexpm` crate of the `gleam-lang/gleam` repository.
 - hexpm's `diff`, `preview` and `hexdocs` services depend on hex_core `~> 0.18.0` and use its default key.
 - The Fastly edge decodes `Signed` in `fastly/hex-shared/src/policy.rs` to read a policy's visibility. It doesn't verify the signature.
 - No registry payload says when it was built, and nothing ties a file to the current state of the registry. A mirror or proxy can serve an old, validly signed `packages/NAME` that lacks a release, a retirement or an advisory.
@@ -153,7 +153,7 @@ enum KeyStatus {
 }
 ```
 
-`registry/versions.proto` gets one field:
+`registry/versions.proto` gets the field `expires_at`:
 
 ```proto
 message Versions {
@@ -229,6 +229,8 @@ hexpm signs every registry file with every signing key that it holds, with the p
 
 ### Intermediate key list
 
+The intermediate key list holds two sets of keys. `intermediate_keys` are the keys that sign the signing key list. `root_keys` are the keys that sign the next intermediate key list. The list has its name from the first set.
+
 `version` increases by exactly 1 with every new list. The repository keeps every version at `keys/intermediate/VERSION`. Such a file never changes or disappears.
 
 Every intermediate key list with version N + 1 has these signatures:
@@ -263,7 +265,7 @@ A repository is configured with either root keys or a single public key. The bui
 
 The rest of this section applies to a repository with root keys. For such a repository a client doesn't read field 2 and doesn't keep hex.pm's old RSA key. A client that accepted field 2 when field 3 is missing would accept files forged with the old key.
 
-`HEX_UNSAFE_REGISTRY=1` and `repo_verify => false` skip all of it, as today.
+A client can have an option that turns verification off. In Hex that is `HEX_UNSAFE_REGISTRY=1` and in hex_core it's `repo_verify => false`, as today. With such an option the client skips all of this section.
 
 A client does these checks:
 
@@ -288,7 +290,7 @@ An entry that isn't valid is ignored. It isn't an error, and the client continue
 
 **Signed by a set of keys.** A message is signed by a set of keys if at least one of its `signatures` entries is valid for at least one key of the set. Nothing is signed by an empty set. [Signed bytes](#signed-bytes) gives the prefix and the payload of each message.
 
-**Usable key.** A root key is usable if its status is `KEY_ACTIVE` or `KEY_RETIRING`. An intermediate key or a signing key is usable if its status is `KEY_ACTIVE`. A key with any other status isn't usable. That includes an absent status and a status that the client doesn't know.
+**Usable key.** A root key is usable if its status is `KEY_ACTIVE` or `KEY_RETIRING`. An intermediate key or a signing key is usable if its status is `KEY_ACTIVE`. A key with any other status isn't usable. That includes an absent status and a status that the client doesn't know. `KEY_RETIRING` has a meaning for root keys only, so an intermediate key or a signing key with that status isn't usable.
 
 **Expired.** A list or a `versions` file is expired if its `expires_at` is lower than or equal to the client's current time.
 
@@ -301,7 +303,7 @@ A file that the client can't decode raises the same error as a file without a va
 | State | Scope | Start value |
 |---|---|---|
 | Configured root keys | Per repository | Compiled in, or given with `--root-key` |
-| `root_version`: the `version` of the intermediate key list that the configured root keys come from | Per repository | Compiled in, or 0 for `--root-key` |
+| `root_version`: the `version` of the intermediate key list whose `root_keys` field holds the configured root keys | Per repository | Compiled in, or 0 for `--root-key` |
 | Stored intermediate key list, in its signed form | Per set of configured root keys | None |
 | Stored signing key list, in its signed form | Per set of configured root keys | None |
 | Time of the last key list update | Per set of configured root keys | None |
@@ -359,6 +361,8 @@ signed_by_signing_key(resource, signed):
 ```
 
 The second update covers a signing key that hex.pm added after the client's last update.
+
+The 24 hours are a maximum age. A client that updates more often, for example in every command, is also correct. A client stores the lists for two reasons: it saves two requests per command, and the stored versions let it reject an older list.
 
 After `verify_registry_file` returns, the client decodes the payload and checks its `repository` and `name` fields, as today. For `versions` and `packages/NAME` the [freshness checks](#freshness-checks) follow.
 
@@ -496,7 +500,7 @@ The client still runs `check_package` against a `versions` file without `expires
 | `versions_expired` | `versions` is expired. | The command fails. |
 | `versions_rollback` | `versions` has a lower `expires_at` than the highest accepted one, also after one new fetch. | The command fails. |
 | `package_mismatch` | A package file doesn't match its entry in `versions`, also after one new fetch. | The command fails. |
-| `root_keys_retiring` | No configured root key is `KEY_ACTIVE` in the stored intermediate key list. | Warning. The command continues. The message names `retires_at` and the update command. |
+| `root_keys_retiring` | No configured root key is `KEY_ACTIVE` in the stored intermediate key list. | Warning. The command continues, and the client verifies with its trusted root keys as before. The message names `retires_at` and tells the user to install a newer release of the client. |
 
 The four key list errors have one of two results. If both lists are stored and neither is expired, the client prints the error as a warning and continues with the stored lists. Otherwise the command fails, because the client has no list to verify a file with.
 
@@ -593,14 +597,14 @@ Terraform creates the signing key in KMS, with permission to sign for the hexpm 
 
 ### Outside the hexpm organization
 
-rebar3 vendors the new hex_core. Gleam needs the format, the key list update and the freshness check in `gleam-lang/hexpm-rust` and the root keys in the compiler. Mirrors and proxies must serve `keys/intermediate`, `keys/intermediate/VERSION` and `keys/signing`, and mirrors have to sync before `versions` expires. Caching proxies have to fetch `versions` again before it expires. Proxies that verify hex.pm's signature with the old key need the new format before the cutoff. Artifactory and Cloudsmith may be among them. Nobody has checked that, or whether they pass paths that they don't know.
+rebar3 vendors the new hex_core. Gleam needs everything under [Format](#format) and [Client verification](#client-verification) in the `hexpm` crate of the `gleam-lang/gleam` repository, and the root keys in the compiler. Mirrors and proxies must serve `keys/intermediate`, `keys/intermediate/VERSION` and `keys/signing`, and mirrors have to sync before `versions` expires. Caching proxies have to fetch `versions` again before it expires. Proxies that verify hex.pm's signature with the old key need the new format before the cutoff. Artifactory and Cloudsmith may be among them. Nobody has checked that, or whether they pass paths that they don't know.
 
 ## This rotation
 
 1. Generate a root key on each YubiKey. Create the intermediate key and the new signing key in KMS. Sign intermediate key list version 1 with a root key and signing key list version 1 with the intermediate key.
 2. Merge the specification and release hex_core with the root public keys.
 3. Publish the key list files. Deploy hexpm so every file carries field 3, with field 2 still signed by the old RSA key, and `versions` carries `expires_at`. Run the rebuild job and confirm the CDN serves the new files and the key list files. Released clients keep working because they read only field 2.
-4. Release Hex, rebar3 and Gleam with the root keys, and bump hex_core in `diff`, `preview` and `hexdocs`. These require field 3 and the key list files and check `versions`, so none of them ships before step 3 is confirmed. From their release on, upgraded clients reject files signed only with the old key.
+4. Release Hex, rebar3 and Gleam with the new verification and the root keys, and bump hex_core in `diff`, `preview` and `hexdocs`. These require field 3 and the key list files and check `versions`, so none of them ships before step 3 is confirmed. A release with the root keys and without the new verification isn't possible, because a root key doesn't sign registry files. From their release on, upgraded clients reject files signed only with the old key.
 5. Announce a cutoff date in the incident blog post and the user email.
 6. At the cutoff, deploy hexpm without the old key and run the rebuild job. After no SecretSync resource, Pod or Job template references `hexpm-signing-key` version 1, destroy that version. Field 2 is then 256 zero bytes, which released clients reject through their ordinary bad-signature path. An absent field 2 would crash released hex_core on a failed map match in `decode_and_verify_signed/2`.
 
