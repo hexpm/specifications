@@ -231,7 +231,7 @@ hexpm signs every registry file with every signing key that it holds, with the p
 
 The intermediate key list holds two sets of keys. `intermediate_keys` are the keys that sign the signing key list. `root_keys` are the keys that sign the next intermediate key list. The list has its name from the first set.
 
-`version` increases by exactly 1 with every new list. The repository keeps every version at `keys/intermediate/VERSION`. Such a file never changes or disappears.
+`version` increases by exactly 1 with every new list, so no two lists with different content have the same version. The repository keeps every version at `keys/intermediate/VERSION`. Such a file never changes or disappears.
 
 Every intermediate key list with version N + 1 has these signatures:
 
@@ -245,7 +245,7 @@ One signature can meet more than one of these rules. Clients check only the firs
 
 ### Signing key list
 
-`version` increases with every new list.
+`version` increases with every new list, so no two lists with different content have the same version.
 
 A scheduled job in the Google Cloud project of the intermediate key re-signs the signing key list every 7 days. It keeps the keys, increases `version` and sets a new `expires_at`. A change to the keys in the list is a manual step.
 
@@ -397,6 +397,10 @@ newest_intermediate_list():
     trusted = trusted root keys
     if list.version < known:
         raise key_list_rollback
+    stored = stored intermediate key list
+    if there is a stored list and list.version == stored.version
+            and list.payload != stored.payload:
+        raise key_list_conflict
     if list isn't signed by trusted:
         trusted = follow_root_key_chain(known, list.version, trusted)
         if list isn't signed by trusted:
@@ -411,8 +415,11 @@ newest_signing_list(intermediate):
     if list isn't signed by keys:
         raise untrusted_key_list
     stored = stored signing key list
-    if stored is signed by keys and list.version < stored.version:
-        raise key_list_rollback
+    if stored is signed by keys:
+        if list.version < stored.version:
+            raise key_list_rollback
+        if list.version == stored.version and list.payload != stored.payload:
+            raise key_list_conflict
     if list is expired:
         raise key_list_expired
     return list
@@ -495,6 +502,7 @@ The client still runs `check_package` against a `versions` file without `expires
 | `key_list_unavailable` | The client can't fetch a key list file. | See below |
 | `untrusted_key_list` | A key list isn't signed by the keys that the client trusts for it, or a step of the root key chain has the wrong version. | See below |
 | `key_list_rollback` | A key list has a lower `version` than the stored one, or than `root_version`. | See below |
+| `key_list_conflict` | A key list has the same `version` as the stored one and a different `payload`. | See below |
 | `key_list_expired` | A fetched key list is expired. | See below |
 | `untrusted_signature` | A registry file isn't signed by a usable signing key, also after one key list update in this command. | The command fails. |
 | `versions_expired` | `versions` is expired. | The command fails. |
@@ -502,7 +510,7 @@ The client still runs `check_package` against a `versions` file without `expires
 | `package_mismatch` | A package file doesn't match its entry in `versions`, also after one new fetch. | The command fails. |
 | `root_keys_retiring` | No configured root key is `KEY_ACTIVE` in the stored intermediate key list. | Warning. The command continues, and the client verifies with its trusted root keys as before. The message names `retires_at` and tells the user to install a newer release of the client. |
 
-The four key list errors have one of two results. If both lists are stored and neither is expired, the client prints the error as a warning and continues with the stored lists. Otherwise the command fails, because the client has no list to verify a file with.
+The five key list errors have one of two results. If both lists are stored and neither is expired, the client prints the error as a warning and continues with the stored lists. Otherwise the command fails, because the client has no list to verify a file with.
 
 A message for `key_list_expired` or `versions_expired` names the expiry time and the local time, because a wrong clock causes the same error.
 
@@ -571,7 +579,7 @@ If one YubiKey is lost, the other root key and a replacement key sign a list tha
 
 ### specifications
 
-`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a signature with the prefix of another tier, a signature with the prefix of another resource, a root key chain, an expired `versions` file, a `versions` file with a lower `expires_at` than an accepted one and a package file that doesn't match `versions`.
+`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a list with the same version and a different payload, a signature with the prefix of another tier, a signature with the prefix of another resource, a root key chain, an expired `versions` file, a `versions` file with a lower `expires_at` than an accepted one and a package file that doesn't match `versions`.
 
 ### hex_core
 
