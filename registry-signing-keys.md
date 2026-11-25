@@ -146,7 +146,7 @@ A client verifies a file with the prefix of the resource that it requested. Prot
 
 A file can carry several signatures, one per signing key hexpm holds. This is how an algorithm change works: hexpm signs with a key of each algorithm and a client verifies the one it implements.
 
-`KEY_RETIRING` on a root key tells users that a client update is coming. hex.pm publishes an intermediate key list that marks the old root keys as retiring with a `retires_at` date. A client released before the roll finds that none of its compiled-in root keys is `KEY_ACTIVE`. On each registry fetch it prints a warning with the date and the update command. Clients don't enforce `retires_at`. The client keeps working after that date, because it follows the [root key chain](#root-key-chain) to the new root keys.
+`KEY_RETIRING` on a root key tells users that a client update is coming. hex.pm publishes an intermediate key list that marks the old root keys as retiring with a `retires_at` date. A client released before the roll finds that none of its configured root keys is `KEY_ACTIVE`. After each key list update it prints a warning with the date and the update command. Clients don't enforce `retires_at`. The client keeps working after that date, because it follows the [root key chain](#root-key-chain) to the new root keys.
 
 The enums are `optional` because protoc-generated proto2 parsers drop an unknown enum value, and a dropped `required` field fails the whole message. Value 0 of each enum is unspecified. A parser that substitutes the default for an absent or unknown value then skips the key or treats it as revoked.
 
@@ -156,67 +156,232 @@ Each signature adds about 110 bytes to a registry file before gzip: a 32-byte ke
 
 A repository is configured with either root keys or a single public key. The built-in `hexpm` repository and hex.pm organization repositories use root keys. Repositories added with `mix hex.repo add --root-key PATH` use the given root key. Repositories added with `mix hex.repo add --public-key` keep the single key and today's check of field 2.
 
-A client release compiles in the root keys together with the `version` of the intermediate key list that they come from. That version is also the minimum version the client accepts. Root keys given with `--root-key` have version 0.
+The rest of this section applies to a repository with root keys. For such a repository a client doesn't read field 2 and doesn't keep hex.pm's old RSA key. A client that accepted field 2 when field 3 is missing would accept files forged with the old key.
 
-Clients store both lists in their signed form with the time of the fetch, one pair per set of configured root keys, so `hexpm` and every `hexpm:ORG` repository share them. Hex stores them in its registry cache under `~/.hex`. hex_core takes the stored lists in its config and returns the lists it selected.
+`HEX_UNSAFE_REGISTRY=1` and `repo_verify => false` skip all of it, as today.
+
+### Overview
+
+```mermaid
+flowchart TD
+    R["Root keys<br/>configured in the client"]
+    IL["keys/intermediate<br/>intermediate key list"]
+    IK["Intermediate keys"]
+    NR["Root keys of the next list version"]
+    SL["keys/signing<br/>signing key list"]
+    SK["Signing keys"]
+    F["names, versions,<br/>packages/NAME, policies/NAME"]
+
+    R -->|sign| IL
+    IL -->|lists| IK
+    IL -->|lists| NR
+    NR -->|sign| IL
+    IK -->|sign| SL
+    SL -->|lists| SK
+    SK -->|sign| F
+```
+
+A client accepts a registry file only if it can follow these signatures from a root key that it trusts to the file. A client accepts a `packages/NAME` file only if it also matches a current `versions` file, see [Freshness](#freshness).
+
+### Terms
+
+The procedures below use these terms with one meaning each.
+
+**Valid signature entry.** A `Signature` entry is valid for a key, a prefix and a payload if all of these are true:
+
+- `key_id` equals the SHA-256 of the key's `public_key`.
+- The client implements the key's `algorithm`.
+- `signature` verifies over `prefix || payload` with that key and that algorithm.
+
+An entry that isn't valid is ignored. It isn't an error, and the client continues with the next entry.
+
+**Signed by a set of keys.** A message is signed by a set of keys if at least one of its `signatures` entries is valid for at least one key of the set. Nothing is signed by an empty set. The prefix and the payload depend on the message:
+
+| Message | Prefix | Payload |
+|---|---|---|
+| Intermediate key list | `"hex-registry-intermediate-keys\n"` | `SignedKeys.payload` |
+| Signing key list | `"hex-registry-signing-keys\n"` | `SignedKeys.payload` |
+| Registry file | The prefix of the requested resource | `Signed.payload` |
+
+**Usable key.** A root key is usable if its status is `KEY_ACTIVE` or `KEY_RETIRING`. An intermediate key or a signing key is usable if its status is `KEY_ACTIVE`. A key with any other status isn't usable. That includes an absent status and a status that the client doesn't know.
+
+**Expired.** A list or a `versions` file is expired if its `expires_at` is lower than or equal to the client's current time.
+
+**Error.** A procedure that raises an error stops. The command fails with a message that names the error. The client doesn't use or cache the file that caused the error, and its stored state stays as it was. [Errors and warnings](#errors-and-warnings) lists every error and the one case where an error becomes a warning.
+
+A file that the client can't decode raises the same error as a file without a valid signature.
+
+### Client state
+
+| State | Scope | Start value |
+|---|---|---|
+| Configured root keys | Per repository | Compiled in, or given with `--root-key` |
+| `root_version`: the `version` of the intermediate key list that the configured root keys come from | Per repository | Compiled in, or 0 for `--root-key` |
+| Stored intermediate key list, in its signed form | Per set of configured root keys | None |
+| Stored signing key list, in its signed form | Per set of configured root keys | None |
+| Time of the last key list update | Per set of configured root keys | None |
+| Highest accepted `expires_at` of `versions` | Per repository | None |
+| Cached registry entries and their ETags | Per repository | None |
+
+`hexpm` and every `hexpm:ORG` repository have the same configured root keys, so they share the stored lists. Hex keeps the state in its registry cache under `~/.hex`. hex_core takes the stored lists in its config and returns the lists it selected.
+
+A client without stored state, such as a CI machine with an empty cache, starts every command with the start values.
+
+If the stored intermediate key list has a `version` below `root_version`, the client deletes both stored lists before it does anything else. This occurs after a client upgrade.
+
+The **trusted root keys** are:
+
+- The usable keys in `root_keys` of the stored intermediate key list, if there is a stored list.
+- The configured root keys, if there is none.
+
+### Verifying a registry file
+
+```mermaid
+flowchart TD
+    A["Registry file fetched"] --> B{"Both lists stored, updated in the<br/>last 24 hours and not expired?"}
+    B -- yes --> C
+    B -- no --> U["Key list update"]
+    U --> C{"File signed by the usable keys<br/>of the stored signing key list?"}
+    C -- yes --> OK["Accept the payload"]
+    C -- no --> D{"Key list update already run<br/>in this command?"}
+    D -- no --> U
+    D -- yes --> E["Error: untrusted_signature"]
+```
+
+```
+verify_registry_file(resource, signed):
+    if lists_need_update() and not updated_in_this_command:
+        update_key_lists()
+    if signed_by_signing_key(resource, signed):
+        return signed.payload
+    if not updated_in_this_command:
+        update_key_lists()
+        if signed_by_signing_key(resource, signed):
+            return signed.payload
+    raise untrusted_signature
+
+lists_need_update():
+    return there is no stored intermediate key list
+        or there is no stored signing key list
+        or the last key list update is more than 24 hours ago
+        or a stored list is expired
+
+signed_by_signing_key(resource, signed):
+    list = stored signing key list
+    if there is no list or list is expired:
+        return false
+    return signed is signed by the usable keys in list.signing_keys
+```
+
+The second update covers a signing key that hex.pm added after the client's last update.
+
+After `verify_registry_file` returns, the client decodes the payload and checks its `repository` and `name` fields, as today. For `versions` and `packages/NAME` the checks under [Freshness](#freshness) follow.
 
 ### Key list update
 
-A client updates its lists before it verifies a registry file in any of these cases:
+The update fetches both lists and replaces the stored ones only if both pass every check.
 
-- It has no stored lists.
-- It fetched the stored lists more than 24 hours ago.
-- A stored list has expired.
-- A registry file has no signature by a key that is `KEY_ACTIVE` in the stored signing key list. The client updates one time and verifies the file again.
+```
+update_key_lists():
+    updated_in_this_command = true
+    try:
+        intermediate = newest_intermediate_list()
+        signing = newest_signing_list(intermediate)
+    on error:
+        if both lists are stored and neither is expired:
+            warn with the error, and return
+        raise the error
 
-The trusted root keys are the configured root keys and the `root_keys` of the stored intermediate key list, without the keys that the stored list marks `KEY_REVOKED`. A client without stored state trusts the configured root keys.
+    revoked = the keys that are usable in the stored lists
+              and aren't usable in intermediate and signing
+    store intermediate, signing and the current time
+    if revoked isn't empty:
+        for every repository that uses these root keys:
+            drop the cached entries, their ETags
+            and the highest accepted expires_at
+    if no configured root key is KEY_ACTIVE in intermediate.root_keys:
+        warn root_keys_retiring
 
-1. Fetch `keys/intermediate`, with the ETag of the stored list if there is one.
-2. Verify that at least one `signatures` entry is by a trusted root key. Skip entries with an unknown `key_id`. If no entry verifies, follow the [root key chain](#root-key-chain) and verify again.
-3. Reject the list if its `version` is below the stored version or below the compiled-in version, or if its `expires_at` has passed. Store the list.
-4. Drop the stored signing key list if no signature on it is by a key that is `KEY_ACTIVE` in the stored intermediate key list.
-5. Fetch `keys/signing`, with the ETag of the stored list if there is one.
-6. Verify that at least one `signatures` entry is by an intermediate key that is `KEY_ACTIVE` in the stored intermediate key list.
-7. Reject the list if its `version` is below the stored version or if its `expires_at` has passed. Store the list.
+newest_intermediate_list():
+    list = fetch keys/intermediate, or raise key_list_unavailable
+    known = version of the stored intermediate key list, or root_version
+    trusted = trusted root keys
+    if list.version < known:
+        raise key_list_rollback
+    if list isn't signed by trusted:
+        trusted = follow_root_key_chain(known, list.version, trusted)
+        if list isn't signed by trusted:
+            raise untrusted_key_list
+    if list is expired:
+        raise key_list_expired
+    return list
 
-A rejected or unreachable list leaves the stored list in place. The client doesn't verify a fetched registry file against an expired list.
+newest_signing_list(intermediate):
+    list = fetch keys/signing, or raise key_list_unavailable
+    keys = usable keys in intermediate.intermediate_keys
+    if list isn't signed by keys:
+        raise untrusted_key_list
+    stored = stored signing key list
+    if stored is signed by keys and list.version < stored.version:
+        raise key_list_rollback
+    if list is expired:
+        raise key_list_expired
+    return list
+```
+
+The client sends the ETag of a stored list with the fetch. A `304` means that the fetched list is the stored one, and the checks run on it as on any other list.
+
+A stored signing key list that isn't signed by a usable intermediate key doesn't count for the rollback check. This is the case after a root key revokes the intermediate key that signed it.
 
 ### Root key chain
 
 Every intermediate key list with version N + 1 has these signatures:
 
-- One by a root key that is `KEY_ACTIVE` or `KEY_RETIRING` in version N. A client that knows version N can then verify the list.
+- One by a root key that is usable in version N. A client that knows version N can then verify the list.
 - One by a root key that the list itself marks `KEY_ACTIVE`. A client release that compiles in only the root keys of this list can then verify it.
 - One by every root key that the list adds. This proves that the new key can sign before a later list depends on it.
 
 One signature can meet more than one of these rules. Clients check only the first rule. The script that signs the list checks all three. The repository keeps every version at `keys/intermediate/VERSION`.
 
-A client follows the chain when the newest list has no signature by a root key that it trusts. This occurs after a root roll, for a client that was released before the roll or that was offline during it.
+A client follows the chain if the newest list isn't signed by its trusted root keys. This occurs after a root roll, for a client that was released before the roll or that was offline during it.
 
-1. Start at the version of the stored list, or at the compiled-in version without a stored list.
-2. Fetch `keys/intermediate/VERSION` for the next version. Require that its `version` is the requested one.
-3. Verify that at least one `signatures` entry is by a trusted root key. Don't check `expires_at`.
-4. Replace the trusted root keys with the `root_keys` of that list that are `KEY_ACTIVE` or `KEY_RETIRING`.
-5. Repeat from step 2 until the version of the newest list is reached.
+```
+follow_root_key_chain(known, newest, trusted):
+    for version in known + 1, known + 2, ..., newest - 1:
+        step = fetch keys/intermediate/VERSION, or raise key_list_unavailable
+        if step.version != version:
+            raise untrusted_key_list
+        if step isn't signed by trusted:
+            raise untrusted_key_list
+        trusted = usable keys in step.root_keys
+    return trusted
+```
 
-A planned root roll therefore needs no client release, and a client of any age can reach the current root keys. The limit is a compromised root key. Someone who holds a root key that was trusted at version N can forge a chain for every client whose known version is N or lower. Such clients need a release with new root keys and a higher compiled-in version.
+The client doesn't check `expires_at` of a step, because every list before the newest one is expected to be expired. It doesn't store a step. Only the newest list is stored, after it passes `newest_intermediate_list`.
 
-### Registry files
+A planned root roll therefore needs no client release, and a client of any age can reach the current root keys. The limit is a compromised root key. Someone who holds a root key that was usable at version N can forge a chain for every client whose known version is N or lower. Such clients need a release with new root keys and a higher `root_version`.
 
-For a repository with root keys:
+### Errors and warnings
 
-1. Accept the file if at least one `signatures` entry verifies, with the prefix of the requested resource, under a signing key that is `KEY_ACTIVE` in the stored signing key list, and that list hasn't expired.
-2. Otherwise run the key list update one time, if this command hasn't run it yet, and check again.
-3. For these repositories, don't verify field 2 and don't keep hex.pm's old RSA key in the client. A client that accepted field 2 when field 3 is missing would accept files forged with the old key. Repositories configured with a single public key still verify field 2 with that key.
-4. Warn if none of the client's compiled-in root keys is `KEY_ACTIVE` in the stored intermediate key list. The warning tells the user to update.
+| Name | Raised when | Result |
+|---|---|---|
+| `key_list_unavailable` | The client can't fetch a key list file. | See below |
+| `untrusted_key_list` | A key list isn't signed by the keys that the client trusts for it, or a step of the root key chain has the wrong version. | See below |
+| `key_list_rollback` | A key list has a lower `version` than the stored one, or than `root_version`. | See below |
+| `key_list_expired` | A fetched key list is expired. | See below |
+| `untrusted_signature` | A registry file isn't signed by a usable signing key, also after one key list update in this command. | The command fails. |
+| `versions_expired` | `versions` is expired. | The command fails. |
+| `versions_rollback` | `versions` has a lower `expires_at` than the highest accepted one, also after one new fetch. | The command fails. |
+| `package_mismatch` | A package file doesn't match its entry in `versions`, also after one new fetch. | The command fails. |
+| `root_keys_retiring` | No configured root key is `KEY_ACTIVE` in the stored intermediate key list. | Warning. The command continues. The message names `retires_at` and the update command. |
 
-`HEX_UNSAFE_REGISTRY=1` and `repo_verify => false` skip all of it, as today.
+The four key list errors have one of two results. If both lists are stored and neither is expired, the client prints the error as a warning and continues with the stored lists. Otherwise the command fails, because the client has no list to verify a file with.
 
-Hex keeps decoded registry entries and their ETags in its cache and reuses them on a `304`. On upgrade, Hex drops the entries that an earlier release verified with the RSA key. When a newly stored list revokes a signing key or an intermediate key, Hex also drops the cached entries, the ETags and the stored `expires_at` of that source, so it fetches and verifies them again.
+A message for `key_list_expired` or `versions_expired` names the expiry time and the local time, because a wrong clock causes the same error.
 
-Hex verified its cached entries when it fetched them, so it keeps using them on a `304` and when the repository is unreachable, even if a stored list has expired since.
+An unreachable repository isn't one of these errors. If the client can't fetch a registry file, Hex uses its cached entry, as today. Hex verified a cached entry when it fetched it, so it also keeps using the entry on a `304`, even if a stored list has expired since. After one of the errors above, the client doesn't use a cached entry in the place of the rejected file.
 
-An error for an expired list or an expired `versions` file names the expiry time and the local time, because a wrong clock causes the same error.
+On upgrade, Hex drops the cached entries that an earlier release verified with the RSA key.
 
 ### What a revocation reaches
 
@@ -225,7 +390,7 @@ The stored versions stop a client from accepting an older list in which a revoke
 A client without stored state, such as a CI machine with an empty cache, fetches both lists on every run. Someone who controls the connection or the mirror can give it an older list until that list expires:
 
 - A revoked signing key stays usable against such a client for 30 days at most.
-- A revoked intermediate key stays usable against such a client for 12 months at most, or until the client is upgraded to a release with a higher compiled-in version. After an intermediate key is compromised, the next release of each client raises that version.
+- A revoked intermediate key stays usable against such a client for 12 months at most, or until the client is upgraded to a release with a higher `root_version`. After an intermediate key is compromised, the next release of each client raises that version.
 
 An expired list makes every upgraded client fail on files it has to fetch. hexpm-ops alerts when the signing key list has less than 14 days left and when the intermediate key list has less than 90 days left.
 
@@ -249,15 +414,40 @@ message Versions {
 
 hexpm sets `expires_at` to 7 days ahead on every build of `versions`. Every change to a package builds the file. A job builds the `versions` file of every repository again once the file is older than 24 hours. hexpm never builds a `versions` file with a lower `expires_at` than the build before it.
 
-`versions` lists the versions, the retired versions and the versions with advisories of every package. A client checks package files against it. For a repository configured with root keys, a client:
+`versions` lists the versions, the retired versions and the versions with advisories of every package. A client checks package files against it. For a repository configured with root keys, a client does this in every command that uses a `packages/NAME` file:
 
-1. Fetches `versions` once per command, before it uses a fetched or cached `packages/NAME` file.
-2. Rejects `versions` if its `expires_at` has passed.
-3. Rejects `versions` if its `expires_at` is lower than the highest one that the client has accepted for that repository. Before the error, it fetches the file again without an ETag, one time. Two CDN nodes can serve different builds for a moment after a publish. A file without the field counts as lower than a file with it.
-4. Compares the package file with its entry in `versions`. The versions, the retired versions and the versions with advisories must be equal.
-5. On a mismatch, fetches both files again without ETags, one time. A publish writes the two files one after the other, so a client can see them out of step for a moment. A second mismatch is an error.
+- It fetches `versions` one time and runs `verify_registry_file` and then `check_versions` on it.
+- It runs `check_package` on every package file that it uses. That includes a cached entry after a `304`.
 
-A `versions` file without `expires_at` doesn't expire, and the client still does step 4. Registries built with `mix hex.registry build` have no job that rebuilds them, so their files stay without the field. hex.pm sets the field from the first file that a new signing key signs, so no file without the field verifies for hex.pm.
+```
+check_versions(repository, versions):
+    highest = highest accepted expires_at of repository
+    if versions has expires_at and versions is expired:
+        raise versions_expired
+    if there is a highest:
+        if versions has no expires_at or versions.expires_at < highest:
+            raise versions_rollback
+    if versions has expires_at:
+        store versions.expires_at as the highest accepted one
+
+check_package(versions, package):
+    entry = the entry in versions.packages with the name of package
+    if there is no entry:
+        raise package_mismatch
+    if the versions of package.releases
+            aren't the same set as entry.versions:
+        raise package_mismatch
+    if the versions of the retired releases of package
+            aren't the same set as the versions at the indexes in entry.retired:
+        raise package_mismatch
+    if the versions of the releases of package with advisories
+            aren't the same set as the versions at the indexes in entry.with_advisories:
+        raise package_mismatch
+```
+
+`versions_rollback` and `package_mismatch` each allow one new fetch. The first time one of them is raised in a command, the client fetches `versions` and the package file again without ETags and runs the checks again. If the error is raised again, the command fails. The reasons are that two CDN nodes can serve different builds for a moment after a publish, and that a publish writes the two files one after the other.
+
+A `versions` file without `expires_at` doesn't expire, and the client still runs `check_package` against it. Registries built with `mix hex.registry build` have no job that rebuilds them, so their files stay without the field. hex.pm sets the field from the first file that a new signing key signs. After a client has accepted that file, `check_versions` rejects every hex.pm file without the field.
 
 The check has these limits:
 
@@ -266,7 +456,7 @@ The check has these limits:
 - `names` and `policies/NAME` aren't covered.
 - A client whose clock is ahead of the expiry rejects the file.
 
-Hex keeps using cached entries when the repository is unreachable, as today, also when its cached `versions` has expired.
+Hex keeps using cached entries when the repository is unreachable, as today, also when its cached `versions` is expired.
 
 A mirror serves `versions` as a normal file. It has to sync `versions` and the package files before the expiry, which is at least 6 days away. A caching proxy has to fetch `versions` again before the expiry.
 
