@@ -1,6 +1,6 @@
 # Registry signing keys
 
-The registry is signed with one RSA key whose public half is compiled into Hex, rebar3 and Gleam. Replacing it requires a release of every client. This design adds a root key that clients trust. The root key signs a list of intermediate keys, and an intermediate key signs a list of signing keys. The repository serves both lists as files next to the registry files. Once clients trust the root key, hex.pm replaces a signing key or an intermediate key by publishing a new list. The `versions` file also gets an expiry, so a client can tell that the registry files it receives are current.
+The registry is signed with one RSA key whose public half is compiled into Hex, rebar3 and Gleam. Replacing it requires a release of every client. This design adds a root key that clients trust. The root key signs a list of intermediate keys, and an intermediate key signs a list of signing keys. The repository serves both lists as files next to the registry files. Once clients trust the root key, hex.pm replaces a signing key or an intermediate key by publishing a new list. A root key can also hand trust to a new root key, so a planned root roll needs no client release. The `versions` file also gets an expiry, so a client can tell that the registry files it receives are current.
 
 The names `SignedKeys`, `IntermediateKeys`, `SigningKeys` and "key list", the paths `keys/intermediate` and `keys/signing`, and the `expires_at` field of `Versions` are proposals.
 
@@ -34,6 +34,7 @@ A repository serves the two lists as files, relative to the repository URL:
 | Path | Content | Signed by | Valid for |
 |---|---|---|---|
 | `keys/intermediate` | The newest intermediate key list, a `SignedKeys` message | A root key | 12 months, re-signed every 6 |
+| `keys/intermediate/VERSION` | The intermediate key list with that `version`. Never changes or disappears. | A root key | Not checked, see [Root key chain](#root-key-chain) |
 | `keys/signing` | The newest signing key list, a `SignedKeys` message | An intermediate key | 30 days, re-signed every 7 |
 
 The files are gzipped like registry files and need no authentication. Organization repositories of hex.pm use the files of the `hexpm` repository.
@@ -68,7 +69,8 @@ message Signature {
   required bytes signature = 2;
 }
 
-// Content of the files keys/intermediate and keys/signing
+// Content of the files keys/intermediate, keys/intermediate/VERSION and
+// keys/signing
 message SignedKeys {
   // Encoded SigningKeys or IntermediateKeys message
   required bytes payload = 1;
@@ -84,11 +86,12 @@ message SigningKeys {
 }
 
 message IntermediateKeys {
-  // Increases with every new list
+  // Increases by exactly 1 with every new list
   required uint64 version = 1;
   // Unix time in seconds after which clients reject the list
   required int64 expires_at = 2;
   repeated Key intermediate_keys = 3;
+  // The root keys that clients trust after they accept this list
   repeated Key root_keys = 4;
 }
 
@@ -131,7 +134,7 @@ Each tier signs with its own prefix, so a signature made for one purpose can't v
 
 A file can carry several signatures, one per signing key hexpm holds. This is how an algorithm change works: hexpm signs with a key of each algorithm and a client verifies the one it implements.
 
-`KEY_RETIRING` on a root key is the flag that tells users a client update is coming. hex.pm publishes an intermediate key list that marks the old root keys as retiring with a `retires_at` date, while an old root key still signs it. A client released before the roll verifies the list with an old root key and finds that none of its compiled-in root keys is `KEY_ACTIVE`. On each registry fetch it prints a warning with the date and the update command. Clients don't enforce `retires_at`. An old client stops working when the old root keys stop signing lists and the last list they signed expires.
+`KEY_RETIRING` on a root key tells users that a client update is coming. hex.pm publishes an intermediate key list that marks the old root keys as retiring with a `retires_at` date. A client released before the roll finds that none of its compiled-in root keys is `KEY_ACTIVE`. On each registry fetch it prints a warning with the date and the update command. Clients don't enforce `retires_at`. The client keeps working after that date, because it follows the [root key chain](#root-key-chain) to the new root keys.
 
 The enums are `optional` because protoc-generated proto2 parsers drop an unknown enum value, and a dropped `required` field fails the whole message. Value 0 of each enum is unspecified. A parser that substitutes the default for an absent or unknown value then skips the key or treats it as revoked.
 
@@ -140,6 +143,8 @@ Each signature adds about 110 bytes to a registry file before gzip: a 32-byte ke
 ## Client verification
 
 A repository is configured with either root keys or a single public key. The built-in `hexpm` repository and hex.pm organization repositories use root keys. Repositories added with `mix hex.repo add --root-key PATH` use the given root key. Repositories added with `mix hex.repo add --public-key` keep the single key and today's check of field 2.
+
+A client release compiles in the root keys together with the `version` of the intermediate key list that they come from. That version is also the minimum version the client accepts. Root keys given with `--root-key` have version 0.
 
 Clients store both lists in their signed form with the time of the fetch, one pair per set of configured root keys, so `hexpm` and every `hexpm:ORG` repository share them. Hex stores them in its registry cache under `~/.hex`. hex_core takes the stored lists in its config and returns the lists it selected.
 
@@ -152,15 +157,31 @@ A client updates its lists before it verifies a registry file in any of these ca
 - A stored list has expired.
 - A registry file has no signature by a key that is `KEY_ACTIVE` in the stored signing key list. The client updates one time and verifies the file again.
 
+The trusted root keys are the configured root keys and the `root_keys` of the stored intermediate key list, without the keys that the stored list marks `KEY_REVOKED`. A client without stored state trusts the configured root keys.
+
 1. Fetch `keys/intermediate`, with the ETag of the stored list if there is one.
-2. Verify that at least one `signatures` entry is by a configured root key that the stored intermediate key list doesn't mark `KEY_REVOKED`. Skip entries with an unknown `key_id`.
-3. Reject the list if its `version` is below the stored version or below the client's compiled-in minimum, or if its `expires_at` has passed. Store the list.
+2. Verify that at least one `signatures` entry is by a trusted root key. Skip entries with an unknown `key_id`. If no entry verifies, follow the [root key chain](#root-key-chain) and verify again.
+3. Reject the list if its `version` is below the stored version or below the compiled-in version, or if its `expires_at` has passed. Store the list.
 4. Drop the stored signing key list if no signature on it is by a key that is `KEY_ACTIVE` in the stored intermediate key list.
 5. Fetch `keys/signing`, with the ETag of the stored list if there is one.
 6. Verify that at least one `signatures` entry is by an intermediate key that is `KEY_ACTIVE` in the stored intermediate key list.
 7. Reject the list if its `version` is below the stored version or if its `expires_at` has passed. Store the list.
 
 A rejected or unreachable list leaves the stored list in place. The client doesn't verify a fetched registry file against an expired list.
+
+### Root key chain
+
+Every intermediate key list with version N + 1 has a signature by a root key that is `KEY_ACTIVE` or `KEY_RETIRING` in version N. The repository keeps every version at `keys/intermediate/VERSION`.
+
+A client follows the chain when the newest list has no signature by a root key that it trusts. This occurs after a root roll, for a client that was released before the roll or that was offline during it.
+
+1. Start at the version of the stored list, or at the compiled-in version without a stored list.
+2. Fetch `keys/intermediate/VERSION` for the next version. Require that its `version` is the requested one.
+3. Verify that at least one `signatures` entry is by a trusted root key. Don't check `expires_at`.
+4. Replace the trusted root keys with the `root_keys` of that list that are `KEY_ACTIVE` or `KEY_RETIRING`.
+5. Repeat from step 2 until the version of the newest list is reached.
+
+A planned root roll therefore needs no client release, and a client of any age can reach the current root keys. The limit is a compromised root key. Someone who holds a root key that was trusted at version N can forge a chain for every client whose known version is N or lower. Such clients need a release with new root keys and a higher compiled-in version.
 
 ### Registry files
 
@@ -169,7 +190,7 @@ For a repository with root keys:
 1. Accept the file if at least one `signatures` entry verifies under a signing key that is `KEY_ACTIVE` in the stored signing key list, and that list hasn't expired.
 2. Otherwise run the key list update one time, if this command hasn't run it yet, and check again.
 3. For these repositories, don't verify field 2 and don't keep hex.pm's old RSA key in the client. A client that accepted field 2 when field 3 is missing would accept files forged with the old key. Repositories configured with a single public key still verify field 2 with that key.
-4. Warn if the client's root keys are all `KEY_RETIRING` in the stored intermediate key list. Their signatures are still accepted, and the warning tells the user to update before they stop.
+4. Warn if none of the client's compiled-in root keys is `KEY_ACTIVE` in the stored intermediate key list. The warning tells the user to update.
 
 `HEX_UNSAFE_REGISTRY=1` and `repo_verify => false` skip all of it, as today.
 
@@ -184,7 +205,7 @@ The stored versions stop a client from accepting an older list in which a revoke
 A client without stored state, such as a CI machine with an empty cache, fetches both lists on every run. Someone who controls the connection or the mirror can give it an older list until that list expires:
 
 - A revoked signing key stays usable against such a client for 30 days at most.
-- A revoked intermediate key stays usable against such a client for 12 months at most, or until the client is upgraded to a release with a higher compiled-in minimum version. After an intermediate key is compromised, the next release of each client raises that minimum.
+- A revoked intermediate key stays usable against such a client for 12 months at most, or until the client is upgraded to a release with a higher compiled-in version. After an intermediate key is compromised, the next release of each client raises that version.
 
 An expired list makes every upgraded client fail on files it has to fetch. hexpm-ops alerts when the signing key list has less than 14 days left and when the intermediate key list has less than 90 days left.
 
@@ -242,7 +263,9 @@ A compromised key goes through the same three steps. A list that revoked the old
 
 The intermediate key is replaced the same way one tier up. A root key signs an intermediate key list with both intermediate keys active, and the new intermediate key signs the signing key list. Then a root key signs an intermediate key list that revokes the old intermediate key. Clients then drop every signing key list that only the old intermediate key signed. Neither step needs a rebuild.
 
-No client needs a release for either. [What a revocation reaches](#what-a-revocation-reaches) gives the limits for clients without stored state.
+A root key is replaced through the chain. A root key signs an intermediate key list that adds the new root key and marks the old one `KEY_RETIRING`. Client releases from then on compile in the new root keys. A later list marks the old root key `KEY_REVOKED`.
+
+No client needs a release for any of these. [What a revocation reaches](#what-a-revocation-reaches) gives the limits for clients without stored state.
 
 If both YubiKeys are lost, nothing can sign the next intermediate key list, and every client needs a release with new root keys before the last list expires. A compromised root key also requires a release of every client with new root keys.
 
@@ -254,7 +277,7 @@ If both YubiKeys are lost, nothing can sign the next intermediate key list, and 
 
 ### hex_core
 
-`hex_pb_signed` is regenerated. `hex_registry` signs with a list of signing keys. It builds and signs both lists and verifies as above. `hex_repo` fetches the key list files. `hex_core:default_config/0` replaces `repo_public_key` for hex.pm with the root public keys. Custom repositories are configured with root public keys or with `repo_public_key`. `hex_pb_versions` is regenerated, and `hex_registry` gets the check of a package file against `versions`.
+`hex_pb_signed` is regenerated. `hex_registry` signs with a list of signing keys. It builds and signs both lists and verifies as above. `hex_repo` fetches the key list files. `hex_core:default_config/0` replaces `repo_public_key` for hex.pm with the root public keys and their list version. Custom repositories are configured with root public keys or with `repo_public_key`. `hex_pb_versions` is regenerated, and `hex_registry` gets the check of a package file against `versions`.
 
 ### hex
 
@@ -276,7 +299,7 @@ The new signing key gets its own Secret Manager secret, pinned next to `HEXPM_SI
 
 ### Outside the hexpm organization
 
-rebar3 vendors the new hex_core. Gleam needs the format, the key list update and the freshness check in `gleam-lang/hexpm-rust` and the root keys in the compiler. Mirrors and proxies must serve `keys/intermediate` and `keys/signing`, and mirrors have to sync before `versions` expires. Caching proxies have to fetch `versions` again before it expires. Proxies that verify hex.pm's signature with the old key need the new format before the cutoff. Artifactory and Cloudsmith may be among them. Nobody has checked that, or whether they pass paths that they don't know.
+rebar3 vendors the new hex_core. Gleam needs the format, the key list update and the freshness check in `gleam-lang/hexpm-rust` and the root keys in the compiler. Mirrors and proxies must serve `keys/intermediate`, `keys/intermediate/VERSION` and `keys/signing`, and mirrors have to sync before `versions` expires. Caching proxies have to fetch `versions` again before it expires. Proxies that verify hex.pm's signature with the old key need the new format before the cutoff. Artifactory and Cloudsmith may be among them. Nobody has checked that, or whether they pass paths that they don't know.
 
 ## This rotation
 
