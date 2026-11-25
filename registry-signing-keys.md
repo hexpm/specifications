@@ -17,7 +17,7 @@ The names `SignedKeys`, `IntermediateKeys`, `SigningKeys` and "key list", the pa
 
 There are three tiers.
 
-The root keys are compiled into clients and sign only the intermediate key list. There are two root keys. Each one is generated on its own YubiKey 5 in a PIV slot and never leaves it. PIV attestation proves that the key was generated on the device. A different person holds each YubiKey, and the YubiKeys are offline except when a list is signed. One root signature is enough for a list, so losing one YubiKey leaves the other. The remaining root key then signs a list that adds a replacement root key.
+The root keys are compiled into clients and sign only the intermediate key list. There are two root keys. Each one is generated on its own YubiKey 5 in a PIV slot and never leaves it. PIV attestation proves that the key was generated on the device. A different person holds each YubiKey, and the YubiKeys are offline except when a list is signed. One root signature is enough for a list, so losing one YubiKey leaves the other. The remaining root key and a replacement root key then sign a list that adds the replacement.
 
 The intermediate key signs only the signing key list. It's a Cloud KMS HSM key in a Google Cloud project of its own, which no service account of the hexpm projects can access. A root key can replace it without a client release.
 
@@ -172,7 +172,13 @@ A rejected or unreachable list leaves the stored list in place. The client doesn
 
 ### Root key chain
 
-Every intermediate key list with version N + 1 has a signature by a root key that is `KEY_ACTIVE` or `KEY_RETIRING` in version N. The repository keeps every version at `keys/intermediate/VERSION`.
+Every intermediate key list with version N + 1 has these signatures:
+
+- One by a root key that is `KEY_ACTIVE` or `KEY_RETIRING` in version N. A client that knows version N can then verify the list.
+- One by a root key that the list itself marks `KEY_ACTIVE`. A client release that compiles in only the root keys of this list can then verify it.
+- One by every root key that the list adds. This proves that the new key can sign before a later list depends on it.
+
+One signature can meet more than one of these rules. Clients check only the first rule. The script that signs the list checks all three. The repository keeps every version at `keys/intermediate/VERSION`.
 
 A client follows the chain when the newest list has no signature by a root key that it trusts. This occurs after a root roll, for a client that was released before the roll or that was offline during it.
 
@@ -266,11 +272,11 @@ A compromised key goes through the same three steps. A list that revoked the old
 
 The intermediate key is replaced the same way one tier up. A root key signs an intermediate key list with both intermediate keys active, and the new intermediate key signs the signing key list. Then a root key signs an intermediate key list that revokes the old intermediate key. Clients then drop every signing key list that only the old intermediate key signed. Neither step needs a rebuild.
 
-A root key is replaced through the chain. A root key signs an intermediate key list that adds the new root key and marks the old one `KEY_RETIRING`. Client releases from then on compile in the new root keys. A later list marks the old root key `KEY_REVOKED`.
+A root key is replaced through the chain. An old root key and the new root key sign an intermediate key list that adds the new root key and marks the old one `KEY_RETIRING`. Client releases from then on compile in the new root keys. A later list marks the old root key `KEY_REVOKED`.
 
 No client needs a release for any of these. [What a revocation reaches](#what-a-revocation-reaches) gives the limits for clients without stored state.
 
-If one YubiKey is lost, the other root key signs a list that revokes the lost key and adds a replacement. If both YubiKeys are lost at the same time, nothing can sign the next intermediate key list, and every client needs a release with new root keys before the last list expires. A compromised root key also requires a release of every client with new root keys.
+If one YubiKey is lost, the other root key and a replacement key sign a list that revokes the lost key and adds the replacement. If both YubiKeys are lost at the same time, nothing can sign the next intermediate key list, and every client needs a release with new root keys before the last list expires. A compromised root key also requires a release of every client with new root keys.
 
 ## Changes per repository
 
@@ -298,7 +304,7 @@ A job rebuilds every registry file and policy of every repository and purges the
 
 ### hexpm-ops
 
-Terraform creates the signing key in KMS, with permission to sign for the hexpm service account and with data access audit logs. Terraform also creates the Google Cloud project and the KMS key for the intermediate key, and the scheduled job in that project that re-signs the signing key list. That job can write only the `keys/signing` object of the repository bucket. One script signs a changed signing key list with the KMS key, another signs an intermediate key list with a YubiKey. Both verify the result, upload it and purge the CDN. An alert fires when the signing key list has less than 14 days left, when the intermediate key list has less than 90 days left, or when a `versions` file has less than 5 days left. Staging gets its own root keys, intermediate key and signing key, and every step runs there first.
+Terraform creates the signing key in KMS, with permission to sign for the hexpm service account and with data access audit logs. Terraform also creates the Google Cloud project and the KMS key for the intermediate key, and the scheduled job in that project that re-signs the signing key list. That job can write only the `keys/signing` object of the repository bucket. One script signs a changed signing key list with the KMS key, another signs an intermediate key list with a YubiKey and checks the signature rules of the root key chain. Both verify the result, upload it and purge the CDN. An alert fires when the signing key list has less than 14 days left, when the intermediate key list has less than 90 days left, or when a `versions` file has less than 5 days left. Staging gets its own root keys, intermediate key and signing key, and every step runs there first.
 
 ### Outside the hexpm organization
 
