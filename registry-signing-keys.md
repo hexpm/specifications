@@ -212,7 +212,7 @@ For a repository with root keys:
 
 `HEX_UNSAFE_REGISTRY=1` and `repo_verify => false` skip all of it, as today.
 
-Hex keeps decoded registry entries and their ETags in its cache and reuses them on a `304`. On upgrade, Hex drops the entries that an earlier release verified with the RSA key. When a newly stored list revokes a signing key or an intermediate key, Hex also drops the cached entries and ETags of that source, so it fetches and verifies them again.
+Hex keeps decoded registry entries and their ETags in its cache and reuses them on a `304`. On upgrade, Hex drops the entries that an earlier release verified with the RSA key. When a newly stored list revokes a signing key or an intermediate key, Hex also drops the cached entries, the ETags and the stored `expires_at` of that source, so it fetches and verifies them again.
 
 Hex verified its cached entries when it fetched them, so it keeps using them on a `304` and when the repository is unreachable, even if a stored list has expired since.
 
@@ -247,20 +247,21 @@ message Versions {
 }
 ```
 
-hexpm sets `expires_at` to 7 days ahead on every build of `versions`. Every change to a package builds the file. A job builds the `versions` file of every repository again once the file is older than 24 hours.
+hexpm sets `expires_at` to 7 days ahead on every build of `versions`. Every change to a package builds the file. A job builds the `versions` file of every repository again once the file is older than 24 hours. hexpm never builds a `versions` file with a lower `expires_at` than the build before it.
 
 `versions` lists the versions, the retired versions and the versions with advisories of every package. A client checks package files against it. For a repository configured with root keys, a client:
 
 1. Fetches `versions` once per command, before it uses a fetched or cached `packages/NAME` file.
 2. Rejects `versions` if its `expires_at` has passed.
-3. Compares the package file with its entry in `versions`. The versions, the retired versions and the versions with advisories must be equal.
-4. On a mismatch, fetches both files again without ETags, one time. A publish writes the two files one after the other, so a client can see them out of step for a moment. A second mismatch is an error.
+3. Rejects `versions` if its `expires_at` is lower than the highest one that the client has accepted for that repository. Before the error, it fetches the file again without an ETag, one time. Two CDN nodes can serve different builds for a moment after a publish. A file without the field counts as lower than a file with it.
+4. Compares the package file with its entry in `versions`. The versions, the retired versions and the versions with advisories must be equal.
+5. On a mismatch, fetches both files again without ETags, one time. A publish writes the two files one after the other, so a client can see them out of step for a moment. A second mismatch is an error.
 
-A `versions` file without `expires_at` doesn't expire, and the client still does step 3. Registries built with `mix hex.registry build` have no job that rebuilds them, so their files stay without the field. hex.pm sets the field from the first file that a new signing key signs, so no file without the field verifies for hex.pm.
+A `versions` file without `expires_at` doesn't expire, and the client still does step 4. Registries built with `mix hex.registry build` have no job that rebuilds them, so their files stay without the field. hex.pm sets the field from the first file that a new signing key signs, so no file without the field verifies for hex.pm.
 
 The check has these limits:
 
-- A mirror or proxy can replay an old state of the registry for 7 days at most.
+- A mirror or proxy can hold a client at an old state of the registry for 7 days at most. It can't take a client back behind a state that the client has accepted. A client without stored state has no such protection.
 - A change to a package file that leaves the three lists equal isn't detected. An example is a changed retirement message.
 - `names` and `policies/NAME` aren't covered.
 - A client whose clock is ahead of the expiry rejects the file.
@@ -293,7 +294,7 @@ If one YubiKey is lost, the other root key and a replacement key sign a list tha
 
 ### specifications
 
-`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a signature with the prefix of another tier, a signature with the prefix of another resource, a root key chain, an expired `versions` file and a package file that doesn't match `versions`.
+`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a signature with the prefix of another tier, a signature with the prefix of another resource, a root key chain, an expired `versions` file, a `versions` file with a lower `expires_at` than an accepted one and a package file that doesn't match `versions`.
 
 ### hex_core
 
@@ -301,7 +302,7 @@ If one YubiKey is lost, the other root key and a replacement key sign a list tha
 
 ### hex
 
-Hex vendors the new hex_core, and `Hex.Repo` replaces `@hexpm_public_key` with the root keys. `Hex.Registry.Server` stores the lists, runs the key list update, drops cached entries as described under client verification, and prints the retiring warning. It fetches `versions` once per command and runs the freshness check. It also gets error messages for an expired list, a revoked key, an expired `versions` file and a package file that doesn't match `versions`. `mix hex.repo add` and `mix hex.repo set` get `--root-key PATH`, which configures the repository with a root public key and can be given more than once. `mix hex.registry build` doesn't change.
+Hex vendors the new hex_core, and `Hex.Repo` replaces `@hexpm_public_key` with the root keys. `Hex.Registry.Server` stores the lists, runs the key list update, drops cached entries as described under client verification, and prints the retiring warning. It fetches `versions` once per command, runs the freshness check and stores the highest `expires_at` that it has accepted per repository. It also gets error messages for an expired list, a revoked key, an expired `versions` file, a `versions` file that is older than an accepted one and a package file that doesn't match `versions`. `mix hex.repo add` and `mix hex.repo set` get `--root-key PATH`, which configures the repository with a root public key and can be given more than once. `mix hex.registry build` doesn't change.
 
 ### hexpm
 
