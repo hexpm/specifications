@@ -66,6 +66,7 @@ message Signed {
 message Signature {
   // SHA-256 of the key's DER-encoded SubjectPublicKeyInfo
   required bytes key_id = 1;
+  // For KEY_ALGORITHM_ECDSA_P256_SHA256, the DER-encoded Ecdsa-Sig-Value
   required bytes signature = 2;
 }
 
@@ -198,6 +199,8 @@ Hex keeps decoded registry entries and their ETags in its cache and reuses them 
 
 Hex verified its cached entries when it fetched them, so it keeps using them on a `304` and when the repository is unreachable, even if a stored list has expired since.
 
+An error for an expired list or an expired `versions` file names the expiry time and the local time, because a wrong clock causes the same error.
+
 ### What a revocation reaches
 
 The stored versions stop a client from accepting an older list in which a revoked key is still active. A client with stored state learns of a revocation within 24 hours.
@@ -273,7 +276,7 @@ If one YubiKey is lost, the other root key signs a list that revokes the lost ke
 
 ### specifications
 
-`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements".
+`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a signature with the prefix of another tier, a root key chain, an expired `versions` file and a package file that doesn't match `versions`.
 
 ### hex_core
 
