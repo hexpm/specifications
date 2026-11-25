@@ -129,9 +129,20 @@ enum KeyStatus {
 
 Each tier signs with its own prefix, so a signature made for one purpose can't verify for another:
 
-- A signing key signs `"hex-registry-payload\n" || payload`.
+- A signing key signs `prefix || payload`, with the prefix of the resource from the table below.
 - An intermediate key signs `"hex-registry-signing-keys\n" || payload`, with the `payload` of the signing key list.
 - A root key signs `"hex-registry-intermediate-keys\n" || payload`, with the `payload` of the intermediate key list.
+
+A signing key uses one prefix per kind of resource:
+
+| Resource | Payload | Prefix |
+|---|---|---|
+| `names` | `Names` | `"hex-registry-names\n"` |
+| `versions` | `Versions` | `"hex-registry-versions\n"` |
+| `packages/NAME` | `Package` | `"hex-registry-package\n"` |
+| `policies/NAME` | `Policy` | `"hex-registry-policy\n"` |
+
+A client verifies a file with the prefix of the resource that it requested. Protobuf decodes the bytes of one message as another message without an error, and `Names` and `Versions` have nearly the same fields. The prefix stops a repository or mirror from serving the signed file of one resource in the place of another.
 
 A file can carry several signatures, one per signing key hexpm holds. This is how an algorithm change works: hexpm signs with a key of each algorithm and a client verifies the one it implements.
 
@@ -194,7 +205,7 @@ A planned root roll therefore needs no client release, and a client of any age c
 
 For a repository with root keys:
 
-1. Accept the file if at least one `signatures` entry verifies under a signing key that is `KEY_ACTIVE` in the stored signing key list, and that list hasn't expired.
+1. Accept the file if at least one `signatures` entry verifies, with the prefix of the requested resource, under a signing key that is `KEY_ACTIVE` in the stored signing key list, and that list hasn't expired.
 2. Otherwise run the key list update one time, if this command hasn't run it yet, and check again.
 3. For these repositories, don't verify field 2 and don't keep hex.pm's old RSA key in the client. A client that accepted field 2 when field 3 is missing would accept files forged with the old key. Repositories configured with a single public key still verify field 2 with that key.
 4. Warn if none of the client's compiled-in root keys is `KEY_ACTIVE` in the stored intermediate key list. The warning tells the user to update.
@@ -282,11 +293,11 @@ If one YubiKey is lost, the other root key and a replacement key sign a list tha
 
 ### specifications
 
-`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a signature with the prefix of another tier, a root key chain, an expired `versions` file and a package file that doesn't match `versions`.
+`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a signature with the prefix of another tier, a signature with the prefix of another resource, a root key chain, an expired `versions` file and a package file that doesn't match `versions`.
 
 ### hex_core
 
-`hex_pb_signed` is regenerated. `hex_registry` signs with a list of signing keys, where a key is a private key or a function that signs. It builds and signs both lists and verifies as above. `hex_repo` fetches the key list files. `hex_core:default_config/0` replaces `repo_public_key` for hex.pm with the root public keys and their list version. Custom repositories are configured with root public keys or with `repo_public_key`. `hex_pb_versions` is regenerated, and `hex_registry` gets the check of a package file against `versions`.
+`hex_pb_signed` is regenerated. `hex_registry` signs with a list of signing keys, where a key is a private key or a function that signs. Its functions that sign and verify take the kind of resource. It builds and signs both lists and verifies as above. `hex_repo` fetches the key list files. `hex_core:default_config/0` replaces `repo_public_key` for hex.pm with the root public keys and their list version. Custom repositories are configured with root public keys or with `repo_public_key`. `hex_pb_versions` is regenerated, and `hex_registry` gets the check of a package file against `versions`.
 
 ### hex
 
