@@ -19,6 +19,7 @@ The document has these parts:
 - [Repository rules](#repository-rules) say what a repository does when it signs and publishes.
 - [Client verification](#client-verification) says what a client does with a file.
 - [Limits](#limits) says what the design doesn't protect.
+- [Comparison with TUF](#comparison-with-tuf) says where the design follows The Update Framework and where it doesn't.
 - [Replacing keys later](#replacing-keys-later), [Changes per repository](#changes-per-repository) and [This rotation](#this-rotation) cover operation and rollout.
 
 ## How it works today
@@ -567,6 +568,42 @@ A mirror or proxy must also serve the key list files. Nobody has checked whether
 
 - The client fetches `versions` for every command that reads a package file. The size of that file for hex.pm and the cost of the fetch haven't been measured.
 - A publish signs three files and a full rebuild signs every file. The latency per publish and the KMS quota for a rebuild haven't been measured.
+
+## Comparison with TUF
+
+[The Update Framework](https://theupdateframework.io/) (TUF) defines four roles: root, targets, snapshot and timestamp. This design takes several of its ideas and isn't an implementation of it.
+
+| TUF | This design |
+|---|---|
+| Root metadata, with every version kept as `N.root.json` | The intermediate key list, with every version kept at `keys/intermediate/VERSION` |
+| A new root version is signed by the keys of the version before it and by its own keys | The three signature rules of the [intermediate key list](#intermediate-key-list) |
+| The client follows the root versions one by one | The [root key chain](#root-key-chain), which the client follows only if the direct check fails |
+| Timestamp metadata with a short expiry, signed by an online key | `expires_at` in `versions`, signed by the signing keys |
+| Snapshot metadata, which lists the version of every targets metadata file | `versions`, which lists the versions, the retired versions and the versions with advisories of every package |
+| Targets metadata, which lists the hash and the length of every target file | `packages/NAME`, which lists the checksums of every release tarball |
+| The client rejects metadata with a lower version than the one it trusts | The rollback checks on the key lists and on `versions` |
+| A threshold of signatures per role | Not present. One signature is enough. |
+| Delegations of targets to other keys | Not present |
+| A maximum length for every download | Not present |
+
+TUF has no counterpart of the intermediate key. Its root metadata names the online keys directly. Here the intermediate key lets hex.pm replace a signing key without a YubiKey.
+
+### What TUF protects and this design doesn't
+
+- **Thresholds.** One root key can sign an intermediate key list alone. TUF can require signatures by more than one key. The `signatures` field can carry more than one signature, so a later version of this design can add a threshold.
+- **Separate online roles.** One set of signing keys signs every registry file. Someone who can sign with a signing key can forge every registry file. TUF can give the timestamp, snapshot and targets roles different keys.
+- **Full coverage by the snapshot.** `versions` covers three lists per package and not the content of the package file. It doesn't cover `names` and `policies/NAME`. [Freshness](#freshness) gives the result.
+- **Length limits.** This design sets no maximum size for a file, so a mirror can send a client a file without end. A client can set limits of its own.
+- **New root keys.** A client checks a step of the root key chain only against the root keys of the version before it. In TUF the client also checks the signatures by the keys of the new version. Here the script that signs the list does that check.
+
+### Why this design doesn't use TUF
+
+- **Clients.** hex_core has no dependencies, because rebar3 and Hex vendor it. We know of no maintained TUF client in Erlang or Elixir, so hex_core would need a new implementation of the TUF client workflow.
+- **Format.** The registry has signed protobuf files that every client and mirror reads. The existing TUF tools read and write JSON metadata. TUF would add a second set of metadata files next to the registry files, or replace the registry format.
+- **Size.** Targets metadata lists every target file. For the number of packages on hex.pm that needs delegations to many smaller metadata files, which hexpm would have to build and sign on every publish.
+- **Time.** The old RSA key must stop being trusted soon, and that needs a release of every client. This design changes the files and the code paths that exist.
+
+The design keeps the way to TUF open. The key lists are separate files, and the signatures name their keys, so thresholds, length limits and more coverage in `versions` can each be added later without a new root of trust.
 
 ## Replacing keys later
 
