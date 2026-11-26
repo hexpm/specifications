@@ -208,7 +208,7 @@ Registry files don't carry the lists. This has three effects:
 
 ## Repository rules
 
-This section says what hex.pm does. Another repository that uses root keys follows the same rules, with periods of its own.
+This section says what hex.pm does. Another repository that uses root keys follows the same rules, with periods of its own. Its periods can't be longer than the [limits that clients enforce](#terms).
 
 ### Periods
 
@@ -293,6 +293,8 @@ An entry that isn't valid is ignored. It isn't an error, and the client continue
 **Usable key.** A root key is usable if its status is `KEY_ACTIVE` or `KEY_RETIRING`. An intermediate key or a signing key is usable if its status is `KEY_ACTIVE`. A key with any other status isn't usable. That includes an absent status and a status that the client doesn't know. `KEY_RETIRING` has a meaning for root keys only, so an intermediate key or a signing key with that status isn't usable.
 
 **Expired.** A list or a `versions` file is expired if its `expires_at` is lower than or equal to the client's current time.
+
+**Too far ahead.** A signing key list is too far ahead if its `expires_at` is more than 60 days after the client's current time. A `versions` file is too far ahead if its `expires_at` is more than 30 days after the client's current time. Each limit is higher than the period that hex.pm uses, so a client clock that is behind by some days causes no error. The intermediate key list has no such limit, because only a root key can sign it.
 
 **Error.** A procedure that raises an error stops. The command fails with a message that names the error. The client doesn't use or cache the file that caused the error, and its stored state stays as it was. [Errors and warnings](#errors-and-warnings) lists every error and the one case where an error becomes a warning.
 
@@ -422,6 +424,8 @@ newest_signing_list(intermediate):
             raise key_list_conflict
     if list is expired:
         raise key_list_expired
+    if list is too far ahead:
+        raise key_list_expiry_too_far
     return list
 ```
 
@@ -470,6 +474,8 @@ check_versions(repository, versions):
     highest = highest accepted expires_at of repository
     if versions has expires_at and versions is expired:
         raise versions_expired
+    if versions has expires_at and versions is too far ahead:
+        raise versions_expiry_too_far
     if there is a highest:
         if versions has no expires_at or versions.expires_at < highest:
             raise versions_rollback
@@ -493,6 +499,8 @@ check_package(versions, package):
 
 `versions_rollback` and `package_mismatch` each allow one new fetch. The first time one of them is raised in a command, the client fetches `versions` and the package file again without ETags and runs the checks again. If the error is raised again, the command fails. The reasons are that two CDN nodes can serve different builds for a moment after a publish, and that a publish writes the two files one after the other.
 
+The limit on `expires_at` has two purposes. Without it, someone who can sign with a signing key for a time could sign a `versions` file that never expires. A client that accepted such a file would also store its `expires_at` and reject every later file from hex.pm as `versions_rollback`, until a list revokes the key.
+
 The client still runs `check_package` against a `versions` file without `expires_at`. After a client has accepted a hex.pm file with the field, `check_versions` rejects every hex.pm file without it.
 
 ### Errors and warnings
@@ -504,15 +512,17 @@ The client still runs `check_package` against a `versions` file without `expires
 | `key_list_rollback` | A key list has a lower `version` than the stored one, or than `root_version`. | See below |
 | `key_list_conflict` | A key list has the same `version` as the stored one and a different `payload`. | See below |
 | `key_list_expired` | A fetched key list is expired. | See below |
+| `key_list_expiry_too_far` | The signing key list has an `expires_at` more than 60 days ahead. | See below |
 | `untrusted_signature` | A registry file isn't signed by a usable signing key, also after one key list update in this command. | The command fails. |
 | `versions_expired` | `versions` is expired. | The command fails. |
+| `versions_expiry_too_far` | `versions` has an `expires_at` more than 30 days ahead. | The command fails. |
 | `versions_rollback` | `versions` has a lower `expires_at` than the highest accepted one, also after one new fetch. | The command fails. |
 | `package_mismatch` | A package file doesn't match its entry in `versions`, also after one new fetch. | The command fails. |
 | `root_keys_retiring` | No configured root key is `KEY_ACTIVE` in the stored intermediate key list. | Warning. The command continues, and the client verifies with its trusted root keys as before. The message names `retires_at` and tells the user to install a newer release of the client. |
 
-The five key list errors have one of two results. If both lists are stored and neither is expired, the client prints the error as a warning and continues with the stored lists. Otherwise the command fails, because the client has no list to verify a file with.
+The six key list errors have one of two results. If both lists are stored and neither is expired, the client prints the error as a warning and continues with the stored lists. Otherwise the command fails, because the client has no list to verify a file with.
 
-A message for `key_list_expired` or `versions_expired` names the expiry time and the local time, because a wrong clock causes the same error.
+A message for `key_list_expired`, `key_list_expiry_too_far`, `versions_expired` or `versions_expiry_too_far` names the expiry time and the local time, because a wrong clock causes the same error.
 
 ### Cached entries
 
@@ -532,7 +542,7 @@ The stored versions stop a client from accepting an older list in which a revoke
 
 A client without stored state, such as a CI machine with an empty cache, fetches both lists on every run. Someone who controls the connection or the mirror can give it an older list until that list expires:
 
-- A revoked signing key stays usable against such a client for 30 days at most.
+- A revoked signing key stays usable against such a client for 30 days at most. If someone signed a signing key list of their own with the intermediate key, that is 60 days at most after they signed it.
 - A revoked intermediate key stays usable against such a client for 12 months at most, or until the client is upgraded to a release with a higher `root_version`. After an intermediate key is compromised, the next release of each client raises that version.
 
 ### Compromised root key
@@ -542,9 +552,10 @@ Someone who holds a root key that was usable at version N can forge a chain for 
 ### Freshness
 
 - A mirror or proxy can hold a client at an old state of the registry for 7 days at most. It can't take a client back behind a state that the client has accepted. A client without stored state has no such protection.
+- Someone who can sign with a signing key can sign a `versions` file that is valid for 30 days at most. A client that accepts it rejects the files from hex.pm until a list revokes the key.
 - A change to a package file that leaves the three lists equal isn't detected. An example is a changed retirement message.
 - `names` and `policies/NAME` aren't covered.
-- A client whose clock is ahead of the expiry rejects the file.
+- A client whose clock is ahead of the expiry rejects the file. A client whose clock is more than 23 days behind rejects a new `versions` file as too far ahead, and one whose clock is more than 30 days behind rejects a new signing key list.
 
 ### Mirrors and proxies
 
@@ -579,7 +590,7 @@ If one YubiKey is lost, the other root key and a replacement key sign a list tha
 
 ### specifications
 
-`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a list with the same version and a different payload, a signature with the prefix of another tier, a signature with the prefix of another resource, a root key chain, an expired `versions` file, a `versions` file with a lower `expires_at` than an accepted one and a package file that doesn't match `versions`.
+`registry/signed.proto` and `registry/versions.proto` change as above. `registry-v2.md` gets the key list files, the verification steps and the freshness check. In `security/supply-chain/signing.md` the "Key Management" section is rewritten and the chain of trust comes off "Planned Improvements". The repository gets test vectors that every client implementation runs: a valid file, an expired list, a revoked key, a list with a lower version, a list with the same version and a different payload, a signature with the prefix of another tier, a signature with the prefix of another resource, a root key chain, an expired `versions` file, a signing key list and a `versions` file with an `expires_at` that is too far ahead, a `versions` file with a lower `expires_at` than an accepted one and a package file that doesn't match `versions`.
 
 ### hex_core
 
@@ -587,7 +598,7 @@ If one YubiKey is lost, the other root key and a replacement key sign a list tha
 
 ### hex
 
-Hex vendors the new hex_core, and `Hex.Repo` replaces `@hexpm_public_key` with the root keys. `Hex.Registry.Server` stores the lists, runs the key list update, drops cached entries as described under client verification, and prints the retiring warning. It fetches `versions` once per command, runs the freshness check and stores the highest `expires_at` that it has accepted per repository. It also gets error messages for an expired list, a revoked key, an expired `versions` file, a `versions` file that is older than an accepted one and a package file that doesn't match `versions`. `mix hex.repo add` and `mix hex.repo set` get `--root-key PATH`, which configures the repository with a root public key and can be given more than once. `mix hex.registry build` doesn't change.
+Hex vendors the new hex_core, and `Hex.Repo` replaces `@hexpm_public_key` with the root keys. `Hex.Registry.Server` stores the lists, runs the key list update, drops cached entries as described under client verification, and prints the retiring warning. It fetches `versions` once per command, runs the freshness check and stores the highest `expires_at` that it has accepted per repository. It also gets error messages for an expired list, a revoked key, an expired `versions` file, a list or a `versions` file with an expiry that is too far ahead, a `versions` file that is older than an accepted one and a package file that doesn't match `versions`. `mix hex.repo add` and `mix hex.repo set` get `--root-key PATH`, which configures the repository with a root public key and can be given more than once. `mix hex.registry build` doesn't change.
 
 ### hexpm
 
