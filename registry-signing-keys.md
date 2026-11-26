@@ -59,7 +59,7 @@ flowchart TD
 
 A client accepts a registry file only if it can follow these signatures from a root key that it trusts to the file.
 
-**Root keys.** The root keys are compiled into clients and sign only the intermediate key list. There are two root keys. Each one is generated on its own YubiKey 5 in a PIV slot and never leaves it. PIV attestation proves that the key was generated on the device. A different person holds each YubiKey, and the YubiKeys are offline except when a list is signed. One root signature is enough for a list, so losing one YubiKey leaves the other. The remaining root key and a replacement root key then sign a list that adds the replacement.
+**Root keys.** The root keys are compiled into clients and sign only the intermediate key list. There are two root keys. Each one is generated on its own YubiKey 5 in a PIV slot and never leaves it. PIV attestation proves that the key was generated on the device. Each YubiKey has firmware 5.7.0 or later. With earlier firmware, someone who has the device and laboratory equipment can extract an ECDSA private key (EUCLEAK, Yubico advisory YSA-2024-03). The firmware of a YubiKey can't be updated, so a device with earlier firmware can't be used. A different person holds each YubiKey, and the YubiKeys are offline except when a list is signed. One root signature is enough for a list, so losing one YubiKey leaves the other. The second root key is a backup. It isn't a second approval, because each holder can sign a list alone. The remaining root key and a replacement root key then sign a list that adds the replacement.
 
 **Intermediate key.** The intermediate key signs only the signing key list. It's a Cloud KMS HSM key in a Google Cloud project of its own, which no service account of the hexpm projects can access. A root key can replace it without a client release.
 
@@ -609,7 +609,7 @@ rebar3 vendors the new hex_core. Gleam needs everything under [Format](#format) 
 
 ## This rotation
 
-1. Generate a root key on each YubiKey. Create the intermediate key and the new signing key in KMS. Sign intermediate key list version 1 with a root key and signing key list version 1 with the intermediate key.
+1. Check that each YubiKey has firmware 5.7.0 or later, and generate a root key on each one. Create the intermediate key and the new signing key in KMS. Sign intermediate key list version 1 with a root key and signing key list version 1 with the intermediate key.
 2. Merge the specification and release hex_core with the root public keys.
 3. Publish the key list files. Deploy hexpm so every file carries field 3, with field 2 still signed by the old RSA key, and `versions` carries `expires_at`. Run the rebuild job and confirm the CDN serves the new files and the key list files. Released clients keep working because they read only field 2.
 4. Release Hex, rebar3 and Gleam with the new verification and the root keys, and bump hex_core in `diff`, `preview` and `hexdocs`. These require field 3 and the key list files and check `versions`, so none of them ships before step 3 is confirmed. A release with the root keys and without the new verification isn't possible, because a root key doesn't sign registry files. From their release on, upgraded clients reject files signed only with the old key.
